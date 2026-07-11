@@ -55,6 +55,7 @@ script.approved          → Approval Gate #1 (optional, skippable)
 storyboard.ready
 assets.ready
 recording.requested → recording.completed   (or avatar.requested → avatar.completed)
+voice.completed
 video.rendered
 captions.generated
 thumbnail.generated

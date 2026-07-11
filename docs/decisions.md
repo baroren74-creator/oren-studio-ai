@@ -258,3 +258,40 @@ revised `docs/roadmap.md` Phase 5.
   are still fully documented and can be picked back up without
   redesigning anything else — this decision only removes it from the
   v1 critical path, it doesn't delete the option.
+
+---
+
+## ADR-012 — LangGraph interrupts give at-least-once node execution, not exactly-once
+
+**Status:** Accepted (discovered empirically while building `workflows/graph.py`, Phase 1.13)
+
+**Context:** While testing the mandatory approval gate (`final_review_node`,
+using LangGraph's native `interrupt()`), event emission originally lived
+in a node that ran before the interrupting node, on the assumption that
+splitting it out would make it run exactly once. It didn't — LangGraph
+replays the entire superstep containing the interrupted node on resume,
+which re-ran the "before" node too, producing a duplicate
+`final_review.requested` entry in the in-memory graph state's `events`
+list (verified with a real `graph.invoke()` / `Command(resume=True)`
+round-trip, not by reading LangGraph's docs — see the test in
+`apps/api/tests/test_smoke_e2e.py` and the comment in
+`workflows/graph.py`).
+
+**Decision:** Treat any code that runs near an `interrupt()` call as
+having at-least-once execution semantics, same as Temporal Activities or
+any other durable-execution engine's checkpoint boundary. Concretely:
+the in-memory `events` list in `StudioState` is a debugging aid only,
+not a source of truth. The real `agent_events` table (`docs/database.md`)
+is the source of truth, and any write to it from a node adjacent to an
+interrupt must be idempotent — e.g. a unique constraint on
+`(run_id, event_type)` with `ON CONFLICT DO NOTHING`, or an
+application-level check-before-insert — once Phase 2+ wires real DB
+writes into graph nodes instead of the test-only persistence step
+currently done after `graph.invoke()` completes.
+
+**Consequences:** No architecture change needed — LangGraph remains the
+right choice (ADR-001), this is a usage detail, not a flaw. But it would
+have been a genuinely confusing silent bug (duplicate events in
+production, or a broken `UNIQUE` constraint) if discovered later instead
+of now, in a stub-only test. Worth remembering for every future node that
+does I/O near an interrupt, not just this one.

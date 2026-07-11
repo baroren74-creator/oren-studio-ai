@@ -43,7 +43,7 @@ in case scheduled/automated posting is wanted later.
 0.5.6 (deferred) Track application status in `docs/decisions.md` if/when
       this phase is resumed.
 
-## Phase 1 — Project Initialization 🔄 In progress (this repo)
+## Phase 1 — Project Initialization ✅ Done
 
 1.1 Monorepo skeleton (`docs/`, `apps/`, `packages/`, `services/`,
     `agents/`, `providers/`, `workflows/`, `prompts/`, `scripts/`,
@@ -61,24 +61,42 @@ in case scheduled/automated posting is wanted later.
 1.7 `docs/` populated with vision/prd/architecture/open-source-landscape/
     roadmap/decisions/agents/api/database — done (this batch).
 1.8 Alembic migrations: `projects`, `sources`, `agent_runs`,
-    `agent_events`, `approvals` (see `docs/database.md`).
-1.9 FastAPI skeleton (`apps/api`) + health check + simple API-key auth.
+    `agent_events`, `approvals` (see `docs/database.md`) — done, tested
+    against SQLite (portable — same models run against Postgres via
+    `DATABASE_URL`).
+1.9 FastAPI skeleton (`apps/api`) + health check + simple API-key auth —
+    done, tested (auth rejection + happy path both covered).
 1.10 Next.js skeleton (`apps/web`) + layout (Chat / Projects / Knowledge /
-     Prompts / Settings).
+     Prompts / Settings, plus Ops) — done, `npm run build` passes clean
+     on Next.js 16.
 1.11 `AgentInput`/`AgentOutput` Pydantic schemas in `packages/core/schemas`
-     (see `docs/agents.md`).
-1.12 Agent Registry (config-driven, not hardcoded) in `packages/core`.
-1.13 LangGraph — empty graph definition in `workflows/` (nodes =
-     placeholders, edges = the flow in `docs/api.md` section on Event
-     Types), embedded in `apps/api` — not the hosted Platform server.
-1.14 WebSocket endpoint for streaming `agent_events`.
-1.15 UI: "New Project" screen — URL paste only, no analysis yet.
-1.16 UI: Project timeline view (event list).
-1.17 Ops view: `agent_runs` table.
+     (see `docs/agents.md`) — done.
+1.12 Agent Registry (config-driven, not hardcoded) in `packages/core` —
+     done.
+1.13 LangGraph graph in `workflows/graph.py`, embedded in `apps/api` —
+     not the hosted Platform server — done. Full stage sequence wired
+     (research → knowledge → idea-scoring gate → script → storyboard →
+     recording → video → voice → mandatory approval gate → publish),
+     using LangGraph's native `interrupt()`/`Command(resume=...)` for the
+     approval gate. **Gotcha discovered and documented in-code:**
+     LangGraph replays the whole superstep around an interrupt on
+     resume (at-least-once, not exactly-once) — the real `agent_events`
+     writes in Phase 2+ must be idempotent (e.g. `ON CONFLICT DO
+     NOTHING` keyed on `(run_id, event_type)`), not assume single
+     execution. See `workflows/graph.py` `final_review_node` comment.
+1.14 WebSocket endpoint for streaming `agent_events` — done (in-process
+     broadcaster for now; swap for real Redis Streams pub/sub once
+     `services/orchestrator-worker` exists).
+1.15 UI: "New Project" screen — URL paste only, no analysis yet — done.
+1.16 UI: Project timeline view (event list) — done.
+1.17 Ops view: `agent_runs` table — done.
 1.18 Stub Agent (returns success immediately) to validate the full
-     pipeline shape end-to-end.
+     pipeline shape end-to-end — done, all 8 agents registered.
 1.19 End-to-end smoke test: new project → runs through all Stub Agents →
-     reaches `published` (faked).
+     reaches `published` (faked) — done
+     (`apps/api/tests/test_smoke_e2e.py`, 2 tests, both passing: the
+     approval path reaching `published`, and the rejection path
+     confirming nothing publishes without approval).
 
 ## Phase 2 — Research + Knowledge + Trend Agents
 

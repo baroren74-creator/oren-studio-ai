@@ -23,6 +23,7 @@ build/
 .env
 .env.*
 !.env.example
+!.env.local.example
 
 # ---- Docker / infra ----
 docker/volumes/

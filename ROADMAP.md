@@ -9,7 +9,7 @@ progress at a glance.
 |---|---|---|
 | 0 | Architecture + Open Source Research | ✅ Done — see `docs/architecture.md`, `docs/open-source-landscape.md` |
 | 0.5 | Publishing API applications (Instagram/Facebook/TikTok) | ⏸ Deferred — not needed for v1, see ADR-011 |
-| 1 | Project Initialization (this repo skeleton) | 🔄 In progress — skeleton pushed to GitHub, code not started |
+| 1 | Project Initialization (this repo skeleton) | ✅ Done — repo, infra config, and a tested code skeleton (API + web + orchestrator graph + 8 stub agents) all pushed to GitHub |
 | 2 | Research + Knowledge + Trend Agents | ⬜ Not started |
 | 3 | Script + Storyboard | ⬜ Not started |
 | 3.5 | Hebrew RTL caption rendering spike | ⬜ Not started |

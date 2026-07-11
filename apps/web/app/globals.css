@@ -1,0 +1,47 @@
+:root {
+  color-scheme: light dark;
+  --border: #d0d0d0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.studio-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+.studio-nav {
+  width: 200px;
+  padding: 1rem;
+  border-right: 1px solid var(--border);
+}
+
+.studio-nav a {
+  display: block;
+  padding: 0.4rem 0;
+  text-decoration: none;
+}
+
+.studio-main {
+  flex: 1;
+  padding: 1.5rem 2rem;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th, td {
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  font-size: 0.9rem;
+}
