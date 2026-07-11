@@ -1,0 +1,10 @@
+# Single-owner project — everything defaults to Oren.
+# Replace @oren with the real GitHub handle once the repo is pushed.
+*                           @oren
+
+# Extra scrutiny on anything that touches secrets, publishing, or licensing-sensitive providers
+/.env.example               @oren
+/docs/open-source-landscape.md @oren
+/providers/voice/           @oren
+/providers/avatar/          @oren
+/providers/publish/         @oren

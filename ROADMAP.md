@@ -1,0 +1,21 @@
+# Roadmap (pointer)
+
+The full, granular roadmap lives at
+[`docs/roadmap.md`](docs/roadmap.md) (Phases 0–6, broken into ~70 small
+steps). This file is a high-level index so `git log`/GitHub browsing shows
+progress at a glance.
+
+| Phase | Name | Status |
+|---|---|---|
+| 0 | Architecture + Open Source Research | ✅ Done — see `docs/architecture.md`, `docs/open-source-landscape.md` |
+| 0.5 | Publishing API applications (Instagram/Facebook/TikTok) | ⏳ Not started — long external lead time, should start early |
+| 1 | Project Initialization (this repo skeleton) | 🔄 In progress |
+| 2 | Research + Knowledge + Trend Agents | ⬜ Not started |
+| 3 | Script + Storyboard | ⬜ Not started |
+| 3.5 | Hebrew RTL caption rendering spike | ⬜ Not started |
+| 4 | Production (Recording / Avatar / Video / Voice) | ⬜ Not started |
+| 5 | Publishing + Approval | ⬜ Not started |
+| 6 | Self Learning | ⬜ Not started |
+
+Update this table's status column as phases complete — it's the fastest
+way to answer "where are we" without opening `docs/roadmap.md`.

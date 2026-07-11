@@ -1,0 +1,16 @@
+Copyright (c) 2026 Oren. All Rights Reserved.
+
+This repository ("Oren Studio AI") is a private, single-user personal system.
+It is not licensed for redistribution, resale, or use by third parties.
+No permission is granted to copy, modify, or distribute this codebase without
+explicit written permission from the copyright holder.
+
+Third-party open-source components used by this project (see
+docs/open-source-landscape.md) remain governed by their own respective
+licenses (MIT, Apache-2.0, AGPL-3.0, etc.). Nothing in this file affects the
+license terms of those upstream dependencies.
+
+If this project is ever open-sourced or turned into a commercial product,
+this file must be revisited and replaced with an appropriate OSI license
+before any public release. See docs/decisions.md for the reasoning behind
+keeping this proprietary for now.

@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  repo-hygiene:
+    name: Repo hygiene checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate docker-compose.yml
+        run: docker compose config -q
+
+      - name: Check for accidental secrets
+        uses: gitleaks/gitleaks-action@v2
+
+      - name: Lint markdown docs
+        uses: DavidAnson/markdownlint-cli2-action@v17
+        with:
+          globs: "docs/**/*.md README.md CONTRIBUTING.md ARCHITECTURE.md ROADMAP.md"
+        continue-on-error: true # advisory only until docs stabilize
+
+  # ---------------------------------------------------------------
+  # The jobs below are intentionally disabled (no code exists yet).
+  # Uncomment and wire up as apps/api, apps/web, and agents/* land —
+  # see docs/roadmap.md Phase 1 for the exact trigger point.
+  # ---------------------------------------------------------------
+  # python-tests:
+  #   name: Python (api / agents / providers) — lint + test
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: astral-sh/setup-uv@v3
+  #     - run: uv run ruff check .
+  #     - run: uv run ruff format --check .
+  #     - run: uv run pytest
+  #
+  # web-tests:
+  #   name: Web (Next.js) — lint + build
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: 20
+  #         cache: "npm"
+  #         cache-dependency-path: apps/web/package-lock.json
+  #     - run: npm ci --prefix apps/web
+  #     - run: npm run lint --prefix apps/web
+  #     - run: npm run build --prefix apps/web

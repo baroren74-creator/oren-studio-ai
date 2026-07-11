@@ -1,0 +1,52 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---- Node / Next.js ----
+node_modules/
+.next/
+out/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# ---- Env / secrets ----
+.env
+.env.*
+!.env.example
+
+# ---- Docker / infra ----
+docker/volumes/
+*.pid
+
+# ---- Editors / OS ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---- Logs ----
+*.log
+logs/
+
+# ---- Media / generated assets (large binaries do not belong in git) ----
+apps/web/public/generated/
+**/renders/
+**/tmp/
+*.mp4
+*.mov
+*.wav
+!docs/**/*.mp4
+
+# ---- Local data ----
+*.sqlite3
+.cache/
