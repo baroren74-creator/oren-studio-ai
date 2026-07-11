@@ -13,34 +13,35 @@ status table in the root `ROADMAP.md` as phases complete.
 - Architecture revised based on findings (5 substantive changes — see
   `docs/decisions.md` ADR-001 through ADR-005).
 
-## Phase 0.5 — Publishing API Applications ⏳ Start immediately, run in parallel with everything else
+## Phase 0.5 — Publishing API Applications ⏸ Deferred — not needed for v1 (see ADR-011)
 
-This phase exists because it has the longest, least predictable external
-lead time in the entire project (weeks to months) and does not depend on
-any code being written. Starting it late turns it into the project's
-critical-path bottleneck for no good reason.
+**Superseded by ADR-011.** v1 uses manual publishing: the Publishing
+Agent prepares a final package and a preview, Oren approves, then uploads
+it himself through each platform's own app. None of the platform API
+applications below are required for that flow. This phase stays fully
+documented and ready to resume — unchanged from the original research —
+in case scheduled/automated posting is wanted later.
 
-0.5.1 Register Meta developer app; begin Instagram + Facebook App Review
-      (`instagram_business_basic`, `instagram_business_content_publish`,
-      `pages_manage_posts`) — expect 2–6 weeks incl. Business Verification.
-0.5.2 Register TikTok developer app; begin Content Posting API
+0.5.1 (deferred) Register Meta developer app; begin Instagram + Facebook
+      App Review (`instagram_business_basic`,
+      `instagram_business_content_publish`, `pages_manage_posts`) —
+      expect 2–6 weeks incl. Business Verification.
+0.5.2 (deferred) Register TikTok developer app; begin Content Posting API
       application (`video.publish` scope) — expect 2–6 weeks for initial
       approval, **then** a second compliance audit before public (non
-      SELF_ONLY) posting is allowed. Start this one first — it's the
-      longest.
-0.5.3 Register Google Cloud project + YouTube Data API v3 — low friction
-      at this project's volume (post-Dec-2025 quota pricing), no audit
-      needed under ~100 uploads/day.
-0.5.4 Register LinkedIn app, add "Share on LinkedIn" product
+      SELF_ONLY) posting is allowed.
+0.5.3 (deferred) Register Google Cloud project + YouTube Data API v3 —
+      low friction at this project's volume (post-Dec-2025 quota
+      pricing), no audit needed under ~100 uploads/day.
+0.5.4 (deferred) Register LinkedIn app, add "Share on LinkedIn" product
       (`w_member_social`, self-serve, personal profile only) — low
-      friction, immediate.
-0.5.5 Decide explicitly: is a LinkedIn **company page** actually required?
-      If yes, budget 4 weeks–4 months and expect possible rejection
-      (Marketing Developer Platform). If posting to Oren's personal
-      profile is sufficient, skip this.
-0.5.6 Track all four applications' status in `docs/decisions.md` as they
-      progress — this phase can run for months in the background while
-      Phases 1–4 proceed.
+      friction, immediate, would be the cheapest one to pick up first if
+      automation is ever revisited.
+0.5.5 (deferred) Decide explicitly: is a LinkedIn **company page**
+      actually required? If yes, budget 4 weeks–4 months and expect
+      possible rejection (Marketing Developer Platform).
+0.5.6 (deferred) Track application status in `docs/decisions.md` if/when
+      this phase is resumed.
 
 ## Phase 1 — Project Initialization 🔄 In progress (this repo)
 
@@ -171,22 +172,30 @@ only if compiled with `--enable-libfribidi`, unverified by default.
 4.14 End-to-end test: approved storyboard → final video with captions and
      thumbnail.
 
-## Phase 5 — Publishing + Approval
+## Phase 5 — Publishing + Approval (manual upload — see ADR-011)
 
-5.1 Adopt Postiz (self-hosted) for OAuth/scheduling plumbing across the
-    5 target platforms — do not build this from scratch (see ADR-005).
-5.2 Wire Postiz's publish action behind Oren Studio AI's own approval
-    gate: content sits as a held/paused item until `approvals.status =
-    approved` in Postgres, then the app calls Postiz's API to release it.
+5.1 Publishing Agent: assemble the final package for a project — video
+    file, caption text, title, hashtags, thumbnail — into one clearly
+    labeled per-project export folder.
+5.2 UI: **preview screen** showing the post roughly as it will appear on
+    the target platform (video + caption + hashtags together), so Oren
+    reviews it in context, not as separate raw files.
 5.3 Approval Gate #2 (mandatory): final review screen — video + caption +
-    thumbnail together.
+    thumbnail together. Unchanged from the original plan.
 5.4 DB constraint: `publications.published_at` cannot be set without
-    `approved_at` (enforced at the database level, not just app code).
-5.5 Connect Postiz to whichever Phase-0.5 platform credentials are ready
-    by this point; platforms not yet approved simply stay disabled.
-5.6 Scheduling (not just immediate publish).
-5.7 Full end-to-end test: source URL → ... → Oren's approval → real
-    publish.
+    `approved_at` (enforced at the database level, not just app code) —
+    unchanged; still applies even though "published" now means "Oren
+    uploaded it himself," not "the API call succeeded."
+5.5 UI: after approval, a simple "ready to upload" state — one-click
+    "open export folder," and a "mark as published" action Oren clicks
+    once he's posted it manually (optionally pasting the resulting post
+    URL into `publications.external_post_id` for record-keeping).
+5.6 Full end-to-end test: source URL → ... → Oren's approval → export
+    folder ready → Oren uploads manually → marked published.
+5.7 (deferred, optional future upgrade) If/when automated scheduled
+    posting is wanted: resume Phase 0.5 (platform API applications) and
+    the Postiz integration from ADR-005 — nothing else in the
+    architecture needs to change to add this later.
 
 ## Phase 6 — Self Learning
 

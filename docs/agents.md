@@ -53,7 +53,7 @@ Orchestrator code.
 | Recording Agent | `agents/recording_agent` | v0: manual upload. Later: drives an Avatar provider (MuseTalk/LivePortrait). | `recording.completed` |
 | Video Agent | `agents/video_agent` | Cuts, zooms, captions, B-roll/screenshot overlay, cursor highlight, thumbnail. | `video.rendered`, `captions.generated`, `thumbnail.generated` |
 | Voice Agent | `agents/voice_agent` | Voice enhancement, dubbing, translation, cloning (commercial API by default — ADR-004). | `voice.completed` |
-| Publishing Agent | `agents/publishing_agent` | Prepares posts for Instagram/TikTok/YouTube Shorts/Facebook/LinkedIn via Postiz; never publishes without approval. | `publish.completed` |
+| Publishing Agent | `agents/publishing_agent` | Assembles the final package (video, caption, hashtags, thumbnail) and a platform-style preview; never marks anything published without approval. Oren uploads manually — no publish API call (ADR-011). | `final_review.requested`, `publish.completed` (set by Oren, not an API response) |
 
 Each Agent's exact `payload`/`result` schema is defined in its own
 `agent.py` alongside its implementation — this table is the map, not the

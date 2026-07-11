@@ -91,7 +91,8 @@ or if a cleanly-licensed alternative emerges.
 
 ## ADR-005 — Publishing: adopt Postiz, build only the approval gate
 
-**Status:** Accepted (Phase 0)
+**Status:** Superseded by ADR-011 for v1 — kept for the record and as the
+documented path back if automated publishing is wanted later.
 
 **Context:** Building OAuth + token refresh + chunked upload handling for
 5 platforms from scratch is exactly the kind of already-solved problem
@@ -197,3 +198,63 @@ code is written; the result gets recorded here as ADR-010a once decided.
 
 **Consequences:** Adds a small, explicit phase before Phase 4 rather than
 discovering the problem mid-implementation.
+
+---
+
+## ADR-011 — Publishing: manual upload by Oren, not automated API publishing (supersedes ADR-005 for v1)
+
+**Status:** Accepted (this supersedes ADR-005's Postiz-adoption plan for
+the v1 build; ADR-005's reasoning is kept below for the record, but the
+decision it reached is no longer what gets built first)
+
+**Context:** ADR-005 planned to self-host Postiz and integrate the
+Instagram/TikTok/YouTube/Facebook/LinkedIn publish APIs, gated behind
+Oren's approval. Working through the actual platform requirements
+(`docs/open-source-landscape.md` section 6) surfaced real friction:
+multi-week app review processes, TikTok's two-stage approval, and
+ongoing OAuth/token maintenance (directly experienced first-hand getting
+even a single GitHub token working end-to-end for this repo). Oren then
+raised the obvious question directly: since every publish already
+requires his manual review and approval before anything goes out, what
+is the automated publish API actually buying beyond saving him the last
+step — physically opening the platform's app and tapping "post"?
+
+**Decision:** For v1, the Publishing Agent does not call any platform
+publish API at all. Instead it:
+1. Assembles the final package (video file, caption text, hashtags,
+   thumbnail) exactly as before.
+2. Renders a **preview** in the Studio UI showing how the post will look
+   on the target platform (video + caption + hashtags together, styled
+   like the platform's own post view).
+3. Waits for Oren's approval (Approval Gate #2, unchanged — still
+   enforced at the database level per `approvals`/`publications`).
+4. Once approved, surfaces a simple "ready to upload" state with the
+   final files easy to grab (e.g. a per-project export folder). Oren
+   opens Instagram/TikTok/YouTube/LinkedIn himself, in his own app, and
+   posts it manually.
+5. Oren (optionally) marks the project as `published` in the Studio UI
+   afterward, optionally pasting the resulting post URL for
+   record-keeping in `publications.external_post_id`.
+
+This removes the need for Phase 0.5 (platform API applications) and the
+Postiz integration from the v1 build entirely. Both remain documented as
+a possible **future upgrade**, not a current requirement — see the
+revised `docs/roadmap.md` Phase 5.
+
+**Consequences:**
+- Phase 0.5 is no longer on the critical path — the whole "external
+  approval lead time" risk that ADR-005/ADR-011's predecessor worried
+  about simply disappears for v1.
+- No OAuth/token maintenance burden, no AGPL dependency (Postiz), no
+  platform ToS exposure for automated posting.
+- Costs Oren roughly 30 extra seconds per post (open the app, attach the
+  file, paste the caption, tap post) — on top of the review he was
+  already doing.
+- Lost: one-click "approve and it's live," and any future
+  scheduled/timed posting (Phase 5.6 as originally scoped) — both would
+  require reintroducing platform API integration later if ever wanted.
+- If Oren later wants scheduled/automated posting at higher volume, the
+  Postiz-based plan from ADR-005 and the Phase 0.5 application process
+  are still fully documented and can be picked back up without
+  redesigning anything else — this decision only removes it from the
+  v1 critical path, it doesn't delete the option.

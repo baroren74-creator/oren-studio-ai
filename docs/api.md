@@ -60,8 +60,8 @@ captions.generated
 thumbnail.generated
 caption.text.ready
 final_review.requested   → Approval Gate #2 (mandatory)
-publish.approved
-publish.completed / publish.failed
+publish.approved         → export folder + preview marked ready (ADR-011)
+publish.completed        → Oren manually confirms he uploaded it (not an API callback)
 ```
 
 On any `*.failed` event, the Orchestrator applies retry policy
@@ -77,5 +77,7 @@ draft → pending_approval → approved → published
 
 Enforced at the database level (`docs/database.md`,
 `publications.published_at` requires `approved_at`), not only in
-application code — see ADR-005 for how this interacts with the
-Postiz-based Publishing Agent specifically.
+application code. As of ADR-011, `published` is set by Oren himself
+after he manually uploads via the platform's own app — there is no
+publish API call in v1 (see ADR-005 for the original automated-publish
+design, kept as a documented future option).

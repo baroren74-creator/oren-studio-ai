@@ -8,13 +8,13 @@ progress at a glance.
 | Phase | Name | Status |
 |---|---|---|
 | 0 | Architecture + Open Source Research | ✅ Done — see `docs/architecture.md`, `docs/open-source-landscape.md` |
-| 0.5 | Publishing API applications (Instagram/Facebook/TikTok) | ⏳ Not started — long external lead time, should start early |
-| 1 | Project Initialization (this repo skeleton) | 🔄 In progress |
+| 0.5 | Publishing API applications (Instagram/Facebook/TikTok) | ⏸ Deferred — not needed for v1, see ADR-011 |
+| 1 | Project Initialization (this repo skeleton) | 🔄 In progress — skeleton pushed to GitHub, code not started |
 | 2 | Research + Knowledge + Trend Agents | ⬜ Not started |
 | 3 | Script + Storyboard | ⬜ Not started |
 | 3.5 | Hebrew RTL caption rendering spike | ⬜ Not started |
 | 4 | Production (Recording / Avatar / Video / Voice) | ⬜ Not started |
-| 5 | Publishing + Approval | ⬜ Not started |
+| 5 | Publishing + Approval (manual upload, see ADR-011) | ⬜ Not started |
 | 6 | Self Learning | ⬜ Not started |
 
 Update this table's status column as phases complete — it's the fastest
