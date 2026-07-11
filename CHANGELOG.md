@@ -5,6 +5,40 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Phase 2.1/2.4: LLM provider + Research Agent v1 (real logic)
+- `providers/llm/llm_provider/client.py`: LiteLLM-based provider
+  abstraction (`complete()`, `LLMMessage`, `LLMResponse`, `LLMError`),
+  `<provider>/<model>` naming convention, configurable via
+  `OREN_STUDIO_LLM_MODEL`.
+- `agents/research_agent/github_source.py`: GitHub repo → LLM-ready
+  digest via Gitingest's async `ingest_async()` (its sync wrapper isn't
+  safe to call from inside an Agent's own running event loop — found and
+  documented while building this).
+- `agents/research_agent/agent.py`: real Research Agent v1 — GitHub
+  sources only (other types return `status="skipped"`, not a crash);
+  fetches a repo digest, summarizes it via the LLM provider, and returns
+  a parsed summary + key points.
+- `apps/api/app/models.py` + migration `7f805ed657bb`: new
+  `research_notes` table (`docs/database.md`); `apps/api/app/services/
+  research.py`: `persist_research_note()` writes a row for every
+  `status="success"` Research Agent run.
+- `workflows/graph.py`: `research_node` now forwards the project's
+  `source_type`/`source_url` into the Agent's payload (previously always
+  sent `{}` — invisible while every node was a Stub Agent that ignored
+  its input); added `_agent_event()` so a `None` next_event
+  ("skipped"/"failed" status) no longer leaks into the graph's `events`
+  list.
+- Tests: `agents/research_agent/tests/` (unit tests + one live-network
+  integration test behind `@pytest.mark.integration`),
+  `apps/api/tests/test_research_persistence.py`,
+  `apps/api/tests/test_smoke_e2e.py` updated — its original "all Stub
+  Agents" pipeline-shape test now runs against an isolated stub-only
+  `AgentRegistry` (`build_graph(registry=...)`) so it stays network-free
+  and immune to future stub→real swaps, plus a new test asserting
+  research_node's payload-wiring fix.
+- `Makefile`'s `test` target now actually runs both Python test suites
+  (was a placeholder).
+
 ### Changed — Publishing model (ADR-011)
 - Publishing Agent no longer targets an automated publish API for v1 —
   it prepares a final export package + Studio UI preview; Oren uploads

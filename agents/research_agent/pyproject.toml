@@ -1,0 +1,25 @@
+[project]
+name = "oren-studio-research-agent"
+version = "0.2.0"
+description = "Research Agent — GitHub repo digest (Gitingest) + summary (LLM provider). See docs/agents.md and docs/roadmap.md Phase 2.3."
+requires-python = ">=3.11"
+dependencies = [
+    "gitingest>=0.3",
+    "httpx[socks]>=0.27",
+    "oren-studio-core",
+    "oren-studio-providers-llm",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "integration: real network calls (e.g. live gitingest fetch) — excluded by default, run with `pytest -m integration`",
+]
+addopts = "-m 'not integration'"

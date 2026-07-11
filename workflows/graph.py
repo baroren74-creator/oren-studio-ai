@@ -35,6 +35,8 @@ class StudioState(TypedDict, total=False):
 
     project_id: str
     run_id: str
+    source_type: str | None
+    source_url: str | None
     events: Annotated[list[str], add]
     idea_score: float
     rejected: bool
@@ -44,23 +46,46 @@ class StudioState(TypedDict, total=False):
 IDEA_SCORE_THRESHOLD = 50.0  # ADR-003: below this, idea.rejected — stops before expensive stages
 
 
-def _run_agent_sync(registry: AgentRegistry, agent_name: str, state: StudioState) -> dict[str, Any]:
+def _run_agent_sync(
+    registry: AgentRegistry, agent_name: str, state: StudioState, payload: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Helper: fetch an agent from the registry and run it against the
     current graph state. Agents are async (core.schemas.agent.Agent);
     LangGraph nodes here are sync wrappers around asyncio.run for
     simplicity in this skeleton — real nodes may want async node
-    functions instead once agents do real (I/O-bound) work."""
+    functions instead once agents do real (I/O-bound) work.
+
+    `payload` defaults to {} (Phase 1 stub behavior, still correct for
+    nodes whose Agent doesn't read anything from it yet). Nodes whose
+    real Agent branches on payload contents (e.g. research_node /
+    ResearchAgent's source_type check) must build and pass their own —
+    see the ADR-012-adjacent lesson learned wiring in the real Research
+    Agent (docs/roadmap.md Phase 2.3): a Stub Agent ignoring its input
+    can silently hide a graph wiring gap that only breaks once real
+    logic depends on that input."""
     import asyncio
 
     agent = registry.get(agent_name)
     agent_input = AgentInput(
         run_id=uuid.UUID(state["run_id"]),
         project_id=uuid.UUID(state["project_id"]),
-        payload={},
+        payload=payload or {},
         context=AgentContext(),
     )
     output = asyncio.run(agent.run(agent_input))
     return output.model_dump()
+
+
+def _agent_event(
+    registry: AgentRegistry, agent_name: str, state: StudioState, payload: dict[str, Any] | None = None
+) -> dict:
+    """Run an Agent and turn its next_event into a graph state update.
+    Centralized so every node handles a `None` next_event (Agent status
+    "skipped"/"failed") the same way: no event appended, rather than
+    letting `None` leak into the `events` list — see research_node for
+    the case this was written for (a "skipped" ResearchAgent run)."""
+    out = _run_agent_sync(registry, agent_name, state, payload=payload)
+    return {"events": [out["next_event"]] if out["next_event"] else []}
 
 
 def build_graph(registry: AgentRegistry | None = None):
@@ -71,12 +96,16 @@ def build_graph(registry: AgentRegistry | None = None):
     reg = registry or default_registry
 
     def research_node(state: StudioState) -> dict:
-        out = _run_agent_sync(reg, "research_agent", state)
-        return {"events": [out["next_event"]]}
+        # Only real node so far whose Agent branches on payload contents
+        # (ResearchAgent checks source_type/source_url — agents/
+        # research_agent/agent.py) — everything else is still a Stub
+        # Agent that ignores payload, so still gets {} via _agent_event's
+        # default.
+        payload = {"source_type": state.get("source_type"), "source_url": state.get("source_url")}
+        return _agent_event(reg, "research_agent", state, payload=payload)
 
     def knowledge_node(state: StudioState) -> dict:
-        out = _run_agent_sync(reg, "knowledge_agent", state)
-        return {"events": [out["next_event"]]}
+        return _agent_event(reg, "knowledge_agent", state)
 
     def idea_scoring_node(state: StudioState) -> dict:
         # Phase 1 stub: always scores above threshold. Phase 2.6 replaces
@@ -92,8 +121,7 @@ def build_graph(registry: AgentRegistry | None = None):
         return {"rejected": True, "events": ["idea.rejected"]}
 
     def script_node(state: StudioState) -> dict:
-        out = _run_agent_sync(reg, "script_agent", state)
-        return {"events": [out["next_event"]]}
+        return _agent_event(reg, "script_agent", state)
 
     def storyboard_node(state: StudioState) -> dict:
         # No dedicated Storyboard Agent in the registry (docs/roadmap.md
@@ -102,16 +130,13 @@ def build_graph(registry: AgentRegistry | None = None):
         return {"events": ["storyboard.ready"]}
 
     def recording_node(state: StudioState) -> dict:
-        out = _run_agent_sync(reg, "recording_agent", state)
-        return {"events": [out["next_event"]]}
+        return _agent_event(reg, "recording_agent", state)
 
     def video_node(state: StudioState) -> dict:
-        out = _run_agent_sync(reg, "video_agent", state)
-        return {"events": [out["next_event"]]}
+        return _agent_event(reg, "video_agent", state)
 
     def voice_node(state: StudioState) -> dict:
-        out = _run_agent_sync(reg, "voice_agent", state)
-        return {"events": [out["next_event"]]}
+        return _agent_event(reg, "voice_agent", state)
 
     def final_review_node(state: StudioState) -> dict:
         # Approval Gate #2 (mandatory, docs/api.md) — pauses the graph

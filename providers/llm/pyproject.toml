@@ -1,0 +1,12 @@
+[project]
+name = "oren-studio-providers-llm"
+version = "0.1.0"
+description = "LLM provider abstraction via LiteLLM — see docs/decisions.md ADR (LiteLLM adoption) and docs/open-source-landscape.md section 2"
+requires-python = ">=3.11"
+dependencies = [
+    "litellm>=1.50",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

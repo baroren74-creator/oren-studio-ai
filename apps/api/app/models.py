@@ -1,11 +1,14 @@
-"""SQLAlchemy models for the Phase 1 tables — see docs/database.md.
+"""SQLAlchemy models — see docs/database.md.
 
-Scope matches docs/roadmap.md 1.8 exactly: projects, sources, agent_runs,
-agent_events, approvals. The rest of docs/database.md's schema
-(scripts, storyboards, assets, videos, publications, memory_entries,
-style_profile, prompt_library, favorite_tools, brand_assets) is added
-incrementally in later phases as the features that need them are built —
-not all at once here.
+Phase 1 scope (docs/roadmap.md 1.8) was exactly: projects, sources,
+agent_runs, agent_events, approvals. `research_notes` was added in Phase
+2.3 alongside the real Research Agent (agents/research_agent/agent.py) —
+the first table added incrementally as the feature that needs it landed,
+per the Phase 1 note below. The rest of docs/database.md's schema
+(ideas, scripts, storyboards, assets, videos, publications, memory_entries,
+style_profile, prompt_library, favorite_tools, brand_assets) is still
+added incrementally in later phases as those features are built — not all
+at once here.
 """
 
 from __future__ import annotations
@@ -43,6 +46,9 @@ class Project(Base):
     sources: Mapped[list["Source"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     agent_runs: Mapped[list["AgentRun"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     approvals: Mapped[list["Approval"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    research_notes: Mapped[list["ResearchNote"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
 
 
 class Source(Base):
@@ -99,3 +105,24 @@ class Approval(Base):
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     project: Mapped["Project"] = relationship(back_populates="approvals")
+
+
+class ResearchNote(Base):
+    """Persisted output of a Research Agent run (docs/database.md) — one
+    row per successful `status="success"` AgentOutput from
+    agents/research_agent/agent.py. `interest_score`/`scored_by` are
+    nullable because Phase 2.3's Research Agent doesn't score ideas
+    itself; Phase 2.6's idea-scoring rubric (docs/agents.md) fills those
+    in on a later pass over this same row, not a new one."""
+
+    __tablename__ = "research_notes"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"))
+    summary: Mapped[str | None] = mapped_column(Text)
+    key_points: Mapped[list | None] = mapped_column(JSON)
+    interest_score: Mapped[float | None] = mapped_column(Numeric)  # ADR-003 gate, filled in by Phase 2.6
+    scored_by: Mapped[str | None] = mapped_column(String)  # agent version, e.g. "research_agent@0.2.0"
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    project: Mapped["Project"] = relationship(back_populates="research_notes")

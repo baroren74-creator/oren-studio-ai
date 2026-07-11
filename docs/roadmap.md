@@ -101,13 +101,31 @@ in case scheduled/automated posting is wanted later.
 ## Phase 2 — Research + Knowledge + Trend Agents
 
 2.1 LiteLLM self-hosted, embedded in `apps/api` — provider abstraction
-    (`providers/llm/`), Claude as first configured provider.
+    (`providers/llm/`), Claude as first configured provider — **done**
+    (`providers/llm/llm_provider/client.py`; `<provider>/<model>` naming
+    convention required by LiteLLM's router, e.g.
+    `anthropic/claude-3-5-sonnet-20241022`).
 2.2 `providers/crawl/`: Crawl4AI (default) + Firecrawl self-hosted
     (JS-heavy/anti-bot fallback).
 2.3 `providers/search/`: Tavily (default) + self-hosted SearXNG
     (high-volume/exploratory).
 2.4 Research Agent v1: GitHub repo → Gitingest/Repomix digest → LLM
-    summary.
+    summary — **done**
+    (`agents/research_agent/agent.py`, `agents/research_agent/
+    github_source.py`; Gitingest's async `ingest_async()` required —
+    its sync wrapper calls `asyncio.run()` internally and breaks inside
+    an Agent's already-running event loop, see the comment in
+    `github_source.py`). Output persisted to the `research_notes` table
+    (`apps/api/app/services/research.py`, migration
+    `7f805ed657bb_add_research_notes_table.py`). `workflows/graph.py`'s
+    `research_node` updated to forward `project.source_type`/
+    `source_url` into the Agent's payload — the Stub Agent it replaced
+    never read its input, which hid this wiring gap until the real Agent
+    needed it (see `_agent_event`'s docstring in `workflows/graph.py`).
+    Tests: `agents/research_agent/tests/` (unit, mocked LLM + digest,
+    plus one `@pytest.mark.integration` live-network check),
+    `apps/api/tests/test_smoke_e2e.py` (graph wiring),
+    `apps/api/tests/test_research_persistence.py` (DB persistence).
 2.5 Research Agent v2: YouTube URL → transcript (faster-whisper) →
     summary.
 2.6 Idea Scoring rubric written down explicitly (novelty, audience
