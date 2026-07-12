@@ -47,6 +47,7 @@ On Redis Streams, also persisted to `agent_events` (see
 emits must appear here.
 
 ```
+trend.discovered         → Trend Agent — not part of the per-project pipeline below, see docs/agents.md
 source.ingested
 research.completed
 idea.scored              → below threshold: idea.rejected (stops here, see ADR-003)

@@ -29,9 +29,10 @@ lint: ## Lint all packages (placeholder until apps/agents have code)
 format: ## Format all packages (placeholder until apps/agents have code)
 	@echo "No formattable code yet — placeholder target, see docs/standards.md"
 
-test: ## Run Python test suites (apps/api, agents/research_agent, workflows). apps/web has its own `npm test` once added.
+test: ## Run Python test suites (apps/api, agents/research_agent, agents/trend_agent, workflows). apps/web has its own `npm test` once added.
 	cd apps/api && PYTHONPATH="$(CURDIR):$(CURDIR)/packages/core:$(CURDIR)/workflows:$(CURDIR)/apps/api" python3 -m pytest tests/ -v
 	cd agents/research_agent && PYTHONPATH="$(CURDIR):$(CURDIR)/packages/core:$(CURDIR)/providers/llm" python3 -m pytest tests/ -v
+	cd agents/trend_agent && PYTHONPATH="$(CURDIR):$(CURDIR)/packages/core" python3 -m pytest tests/ -v
 	cd workflows && PYTHONPATH="$(CURDIR):$(CURDIR)/packages/core:$(CURDIR)/providers/llm" python3 -m pytest tests/ -v
 
 migrate: ## Run DB migrations (placeholder — wired up once apps/api exists)

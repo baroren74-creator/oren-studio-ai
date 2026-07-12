@@ -47,7 +47,7 @@ Orchestrator code.
 | Agent | Folder | Responsibility | Emits (on success) |
 |---|---|---|---|
 | Research Agent | `agents/research_agent` | Finds sources, reads documentation, summarizes, understands the underlying technology, finds the *original* source. | `research.completed` |
-| Trend Agent | `agents/trend_agent` | Discovers new things: GitHub Trending, Hacker News, Product Hunt, Reddit, AI news, Twitter/X (deferred), YouTube, blogs. | feeds the Idea Backlog |
+| Trend Agent | `agents/trend_agent` | Discovers new things: GitHub Trending (v1, done), Hacker News, Product Hunt, Reddit, AI news, Twitter/X (deferred), YouTube, blogs. Not a `workflows/graph.py` node — runs independent of any project (`ideas.project_id` is nullable), triggered separately, not per-project. | `trend.discovered`, feeds the Idea Backlog |
 | Knowledge Agent | `agents/knowledge_agent` | Learns documentation/projects, indexes everything to Qdrant, answers from accumulated knowledge. | `source.ingested` |
 | Script Agent | `agents/script_agent` | Writes Hook, Body, CTA, Caption, Title, Hashtags — in Oren's style (`style_profile`). | `script.drafted` |
 | Recording Agent | `agents/recording_agent` | v0: manual upload. Later: drives an Avatar provider (MuseTalk/LivePortrait). | `recording.completed` |

@@ -12,6 +12,7 @@ from enum import Enum
 
 
 class EventType(str, Enum):
+    TREND_DISCOVERED = "trend.discovered"  # Trend Agent — not part of the per-project graph, see docs/agents.md
     SOURCE_INGESTED = "source.ingested"
     RESEARCH_COMPLETED = "research.completed"
     IDEA_SCORED = "idea.scored"

@@ -5,6 +5,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Phase 2.10: Trend Agent v1 (GitHub Trending)
+- `agents/trend_agent/github_trending_source.py`: `fetch_trending_repos()`
+  scrapes `github.com/trending` directly with BeautifulSoup — no official
+  GitHub Trending API exists, and github.com is the one external domain
+  this project's sandbox network allowlist includes, which made it both
+  the pragmatic and the verifiable choice.
+- `agents/trend_agent/agent.py`: real logic replacing the Phase 1.18
+  stub — returns candidate ideas (title, source_url, description,
+  language tag, star counts) from the current trending page, optionally
+  filtered by language/since. Unlike every other Agent so far, Trend
+  Agent is **not** a `workflows/graph.py` node — it discovers ideas
+  independent of any project (see `agent.py`'s module docstring); no
+  `ideas` table persistence yet, deferred until the Idea Backlog UI
+  (Phase 2.13) exists to shape that schema around.
+- `packages/core/core/events/types.py`: added `TREND_DISCOVERED =
+  "trend.discovered"`; documented in `docs/api.md`'s Event types list.
+- Tests: `agents/trend_agent/tests/` — parser tests against a
+  hand-written HTML fixture (deliberately minimal rather than a full
+  scraped-page dump), agent-level tests (mocked), plus one
+  `@pytest.mark.integration` test that fetches the real trending page
+  and checks the parser still matches GitHub's actual markup.
+- `Makefile`'s `test` target now also runs `agents/trend_agent/tests/`.
+
 ### Added — Phase 2.5: Research Agent v2 (YouTube support)
 - `agents/research_agent/youtube_source.py`: `fetch_video_transcript()` —
   fetches YouTube's own captions via `youtube-transcript-api`, not the

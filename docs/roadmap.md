@@ -164,7 +164,24 @@ in case scheduled/automated posting is wanted later.
     LlamaIndex/Haystack (see ADR-002) — writes to Qdrant `knowledge_docs`.
 2.9 Knowledge Agent: semantic search endpoint.
 2.10 Trend Agent v1–v3: GitHub Trending, Hacker News, Product Hunt (free
-     sources first).
+     sources first). **v1 (GitHub Trending) done** —
+     `agents/trend_agent/github_trending_source.py` scrapes
+     `github.com/trending` directly with BeautifulSoup (no official
+     trending API exists, and github.com is the one external domain
+     this project's sandbox network allowlist actually includes — see
+     that module's docstring); `agents/trend_agent/agent.py` returns a
+     list of candidate ideas (title, source_url, description, language
+     tag, star counts). Unlike every other Agent so far, Trend Agent is
+     **not** a `workflows/graph.py` node — it discovers ideas independent
+     of any project (`docs/database.md`'s `ideas.project_id` is nullable
+     for exactly this), so it's triggered separately (a scheduler or a
+     manual "scan now" route, neither built yet). No `ideas` table row is
+     written yet either — same incremental-persistence call as
+     `research_notes` (2.4): land the discovery logic first, wire it to a
+     table once the Idea Backlog UI (2.13) exists to shape that schema
+     around. Hacker News (v2) and Product Hunt (v3) not started. Tests:
+     `agents/trend_agent/tests/` (parser + agent, mocked HTML, plus one
+     `@pytest.mark.integration` live fetch against the real page).
 2.11 Trend Agent v4 (later): Reddit.
 2.12 Trend Agent v5 (deliberately deferred): Twitter/X — cost-gate check
      before building.
