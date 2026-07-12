@@ -267,7 +267,55 @@ in case scheduled/automated posting is wanted later.
     Migration: `apps/api/alembic/versions/c3a9f1d8e2b4_add_style_profile_
     table.py`. Tests: `apps/api/tests/test_style_profile.py` (9 cases —
     versioning, current-lookup, both routes, 404, auth).
-3.2–3.4 Script Agent: Hook, Body+CTA, Caption/Title/Hashtags.
+3.2–3.4 Script Agent: Hook, Body+CTA, Caption/Title/Hashtags. **Done —
+    implemented as one Agent, one structured LLM call**, not three
+    separate steps: the six fields aren't independent (caption
+    references the hook, hashtags follow the body's topic), and
+    docs/agents.md's roster already describes this as one Agent's job;
+    `docs/database.md`'s `scripts` row stores all six together too. Same
+    architectural choice as `workflows/idea_scoring.py` combining four
+    rubric criteria into one call rather than four.
+
+    `agents/script_agent/agent.py`: strict-JSON response (same
+    `_extract_json` markdown-fence-stripping pattern as
+    `workflows/idea_scoring.py`), all six fields required
+    (`hook`/`body`/`cta`/`caption`/`title`/`hashtags`); missing/malformed
+    response -> `status="failed"`, no `research_summary` in payload ->
+    `status="skipped"` (mirrors Research Agent's own convention). Writes
+    in Hebrew — Research Agent's summary/key_points stay English on
+    purpose (see that Agent's system prompts), translation happens here.
+    Folds in whatever `style_*` fields the caller provides
+    (`style_tone_notes`/`style_opening_patterns`/`style_closing_patterns`/
+    `style_avg_length_seconds`) alongside `docs/vision.md`'s baseline
+    style guide (short, fast, clear, technical, hook within 3 seconds);
+    works with the baseline alone if no style_profile exists yet — the
+    questionnaire (3.1) is one-time but not mandatory-before-first-use.
+
+    `workflows/graph.py`: `StudioState` gained `style_tone_notes`/
+    `style_opening_patterns`/`style_closing_patterns`/
+    `style_avg_length_seconds` (seeded by whichever caller invokes the
+    graph — the graph itself never touches the DB, same reasoning as
+    `knowledge_node`'s `source_id` comment) and `script_hook`/`script_body`/
+    `script_cta`/`script_caption`/`script_title`/`script_hashtags`
+    (promoted from a successful run, for the future Storyboard Agent and
+    test visibility). `script_node` now builds a real payload instead of
+    the empty-`{}` default every Stub Agent got.
+
+    Persistence: `apps/api/app/models.py`'s `Script` (table `scripts`,
+    matching docs/database.md; `hashtags` stored as JSON, same
+    simplification as `style_profile`'s pattern fields).
+    `apps/api/app/services/script.py`'s `persist_script()` — same
+    decoupled-from-the-graph shape as `persist_research_note`, and (a
+    first) actually links `style_profile_id` to a real row now that
+    Phase 3.1 exists. Migration:
+    `apps/api/alembic/versions/f4b1e6c8a9d3_add_scripts_table.py`.
+
+    Tests: `agents/script_agent/tests/test_agent.py` (10 cases),
+    `apps/api/tests/test_script_persistence.py` (4 cases),
+    `apps/api/tests/test_smoke_e2e.py`'s
+    `test_script_node_passes_research_and_style_fields_to_real_agent`
+    (payload wiring end-to-end, including style_* fields). Full suite:
+    106 tests passing (`make test`).
 3.5 Prompt Library UI (CRUD + versioning).
 3.6 Approval Gate #1: review/edit script before continuing.
 3.7 Storyboard Agent: **custom LLM-prompting module** (structured JSON:

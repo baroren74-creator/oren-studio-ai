@@ -49,7 +49,7 @@ Orchestrator code.
 | Research Agent | `agents/research_agent` | Finds sources, reads documentation, summarizes, understands the underlying technology, finds the *original* source. | `research.completed` |
 | Trend Agent | `agents/trend_agent` | Discovers new things: GitHub Trending (v1, done), Hacker News, Product Hunt, Reddit, AI news, Twitter/X (deferred), YouTube, blogs. Not a `workflows/graph.py` node — runs independent of any project (`ideas.project_id` is nullable), triggered separately, not per-project. | `trend.discovered`, feeds the Idea Backlog |
 | Knowledge Agent | `agents/knowledge_agent` | Chunks + embeds + indexes the Research Agent's raw digest/transcript text into Qdrant's `knowledge_docs` collection via `packages/memory` (Phase 2.8, done — see the section below). Semantic search (`GET /api/knowledge/search`) is a separate `apps/api` route, not this Agent (Phase 2.9, done). | `source.ingested` |
-| Script Agent | `agents/script_agent` | Writes Hook, Body, CTA, Caption, Title, Hashtags — in Oren's style (`style_profile`, v0 questionnaire done — see the section below; the Agent itself is still the Phase 1.18 stub, Phase 3.2-3.4). | `script.drafted` |
+| Script Agent | `agents/script_agent` | Writes Hook, Body, CTA, Caption, Title, Hashtags together (one structured LLM call, not three) — in Oren's style (`style_profile`, Phase 3.1/3.2-3.4, done — see the section below). | `script.drafted` |
 | Recording Agent | `agents/recording_agent` | v0: manual upload. Later: drives an Avatar provider (MuseTalk/LivePortrait). | `recording.completed` |
 | Video Agent | `agents/video_agent` | Cuts, zooms, captions, B-roll/screenshot overlay, cursor highlight, thumbnail. | `video.rendered`, `captions.generated`, `thumbnail.generated` |
 | Voice Agent | `agents/voice_agent` | Voice enhancement, dubbing, translation, cloning (commercial API by default — ADR-004). | `voice.completed` |
@@ -170,5 +170,41 @@ against a real Postgres instance since none is live from this sandbox;
 verified end-to-end against a throwaway SQLite DB, including the Hebrew
 text round-tripping correctly through JSON storage.
 
-The Script Agent itself (Phase 3.2-3.4) is still the Phase 1.18 stub —
-this section covers only the data it will read once built.
+## Script Agent (Phase 3.2-3.4 — implemented)
+
+`agents/script_agent/agent.py`: one structured LLM call producing all
+six fields at once (`hook`/`body`/`cta`/`caption`/`title`/`hashtags`) —
+the roadmap's 3.2/3.3/3.4 split (Hook generator / Body+CTA /
+Caption+Title+Hashtags) was planning granularity, not three separate
+Agents or LLM calls; the fields aren't independent (a caption references
+the hook, hashtags follow the body's topic) and `docs/database.md`'s
+`scripts` row stores them together. Same architectural choice as
+`workflows/idea_scoring.py` combining four rubric criteria into one call.
+
+Payload (built by `workflows/graph.py`'s `script_node`): `research_summary`/
+`research_key_points` (from Research Agent, via `StudioState`) plus
+whatever `style_tone_notes`/`style_opening_patterns`/
+`style_closing_patterns`/`style_avg_length_seconds` the caller seeded
+into the initial graph state (the graph itself never queries the DB —
+see `knowledge_node`'s comment for the established reasoning; a real
+orchestrator-worker would call `get_current_style_profile()` before
+invoking the graph). No `research_summary` -> `status="skipped"`
+(mirrors Research Agent). Missing/malformed JSON response ->
+`status="failed"` (same `_extract_json` markdown-fence-stripping pattern
+as `workflows/idea_scoring.py`).
+
+Writes in Hebrew — Research Agent's summary/key_points stay English on
+purpose (see that Agent's system prompts: "Script Agent handles Hebrew
+translation later"); this is where that translation actually happens.
+Style guide is `docs/vision.md`'s baseline (short, fast, clear,
+technical, not exhausting, hook within 3 seconds) plus Oren's actual
+style_profile fields when available — the Agent still produces a
+reasonable script with the baseline alone if the questionnaire has never
+been run, since it's one-time but not mandatory-before-first-use.
+
+Persistence: `apps/api/app/models.py`'s `Script` (table `scripts`) via
+`apps/api/app/services/script.py`'s `persist_script()` — the first
+Phase-3 persistence function that can actually link a real
+`style_profile_id`, now that Phase 3.1's questionnaire exists.
+`style_profile_id` is nullable (a script written before the
+questionnaire ever ran has nothing to point at).

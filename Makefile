@@ -29,11 +29,12 @@ lint: ## Lint all packages (placeholder until apps/agents have code)
 format: ## Format all packages (placeholder until apps/agents have code)
 	@echo "No formattable code yet — placeholder target, see docs/standards.md"
 
-test: ## Run Python test suites (apps/api, agents/research_agent, agents/trend_agent, agents/knowledge_agent, workflows, packages/memory, providers/llm). apps/web has its own `npm test` once added.
+test: ## Run Python test suites (apps/api, agents/research_agent, agents/trend_agent, agents/knowledge_agent, agents/script_agent, workflows, packages/memory, providers/llm). apps/web has its own `npm test` once added.
 	cd apps/api && PYTHONPATH="$(CURDIR):$(CURDIR)/packages/core:$(CURDIR)/workflows:$(CURDIR)/providers/llm:$(CURDIR)/packages/memory:$(CURDIR)/apps/api" python3 -m pytest tests/ -v
 	cd agents/research_agent && PYTHONPATH="$(CURDIR):$(CURDIR)/packages/core:$(CURDIR)/providers/llm" python3 -m pytest tests/ -v
 	cd agents/trend_agent && PYTHONPATH="$(CURDIR):$(CURDIR)/packages/core" python3 -m pytest tests/ -v
 	cd agents/knowledge_agent && PYTHONPATH="$(CURDIR):$(CURDIR)/packages/core:$(CURDIR)/providers/llm:$(CURDIR)/packages/memory" python3 -m pytest tests/ -v
+	cd agents/script_agent && PYTHONPATH="$(CURDIR):$(CURDIR)/packages/core:$(CURDIR)/providers/llm" python3 -m pytest tests/ -v
 	cd workflows && PYTHONPATH="$(CURDIR):$(CURDIR)/packages/core:$(CURDIR)/providers/llm" python3 -m pytest tests/ -v
 	cd packages/memory && PYTHONPATH="$(CURDIR)/providers/llm" python3 -m pytest tests/ -v
 	cd providers/llm && python3 -m pytest tests/ -v

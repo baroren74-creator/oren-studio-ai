@@ -5,6 +5,40 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Phase 3.2-3.4: real Script Agent
+- `agents/script_agent/agent.py`: real logic replacing the Phase 1.18
+  stub — one structured LLM call producing hook/body/cta/caption/title/
+  hashtags together (roadmap's 3.2/3.3/3.4 split was planning
+  granularity, not three Agents/calls — same choice
+  `workflows/idea_scoring.py` made for its four rubric criteria). Writes
+  in Hebrew (Research Agent's summary/key_points are English on
+  purpose); folds in whatever style_* fields the caller provides
+  alongside docs/vision.md's baseline style guide, working fine with the
+  baseline alone if no style_profile exists yet. `status="skipped"` when
+  there's no research_summary, `status="failed"` on LLM/parse errors
+  (same `_extract_json` markdown-fence pattern as idea_scoring.py).
+- `workflows/graph.py`: `StudioState` gained `style_tone_notes`/
+  `style_opening_patterns`/`style_closing_patterns`/
+  `style_avg_length_seconds` (seeded by whichever caller invokes the
+  graph, not fetched by the graph itself) and `script_hook`/`script_body`/
+  `script_cta`/`script_caption`/`script_title`/`script_hashtags`
+  (promoted from a successful run). `script_node` now builds a real
+  payload instead of the empty-`{}` Stub Agent default.
+- `apps/api/app/models.py`: new `Script` (table `scripts`, `hashtags`
+  stored as JSON). Migration:
+  `alembic/versions/f4b1e6c8a9d3_add_scripts_table.py` (verified via
+  real `alembic upgrade head` against SQLite, full chain from empty DB).
+- `apps/api/app/services/script.py`: `persist_script()` — first Phase-3
+  persistence function that can actually link a real `style_profile_id`
+  (nullable — a script written before the questionnaire ever ran has
+  nothing to point at).
+- Tests: `agents/script_agent/tests/test_agent.py` (10 cases),
+  `apps/api/tests/test_script_persistence.py` (4 cases), plus a new
+  `apps/api/tests/test_smoke_e2e.py` case proving the graph wiring
+  end-to-end (research_summary + all four style_* fields reaching the
+  real Agent's payload). `Makefile`'s `test` target now also runs
+  `agents/script_agent/`. Full suite: 106 tests passing.
+
 ### Added — Phase 3.1: style_profile v0 (manual questionnaire)
 - `apps/api/app/models.py`: new `StyleProfile` (table `style_profile`,
   matching docs/database.md). `opening_patterns`/`closing_patterns`

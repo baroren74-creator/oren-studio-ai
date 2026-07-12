@@ -48,6 +48,27 @@ class StudioState(TypedDict, total=False):
     idea_score_breakdown: dict[str, int] | None
     rejected: bool
     approved: bool
+    # Style profile fields (Phase 3.1, docs/database.md's style_profile
+    # table) — deliberately flat scalars here, not fetched by the graph
+    # itself (workflows/graph.py never touches the DB — see knowledge_node's
+    # comment for the established reasoning). Whatever eventually calls
+    # graph.invoke() for real is responsible for looking up the current
+    # style_profile (apps/api/app/services/style_profile.py's
+    # get_current_style_profile()) and seeding these into the initial
+    # state, same as source_type/source_url today.
+    style_tone_notes: str | None
+    style_opening_patterns: list[str] | None
+    style_closing_patterns: list[str] | None
+    style_avg_length_seconds: float | None
+    # Script Agent output (Phase 3.2-3.4) — promoted into state the same
+    # way research_summary/research_key_points are, for downstream nodes
+    # (Storyboard Agent, Phase 3.7, not built yet) and test visibility.
+    script_hook: str | None
+    script_body: str | None
+    script_cta: str | None
+    script_caption: str | None
+    script_title: str | None
+    script_hashtags: list[str] | None
 
 
 IDEA_SCORE_THRESHOLD = 50.0  # ADR-003: below this, idea.rejected — stops before expensive stages
@@ -176,7 +197,32 @@ def build_graph(registry: AgentRegistry | None = None):
         return {"rejected": True, "events": ["idea.rejected"]}
 
     def script_node(state: StudioState) -> dict:
-        return _agent_event(reg, "script_agent", state)
+        # Phase 3.2-3.4: Script Agent writes Hook/Body/CTA/Caption/Title/
+        # Hashtags from research_summary/research_key_points, in Oren's
+        # voice per whatever style_profile fields the caller seeded into
+        # the initial state (see StudioState's comment above).
+        payload = {
+            "research_summary": state.get("research_summary"),
+            "research_key_points": state.get("research_key_points"),
+            "style_tone_notes": state.get("style_tone_notes"),
+            "style_opening_patterns": state.get("style_opening_patterns"),
+            "style_closing_patterns": state.get("style_closing_patterns"),
+            "style_avg_length_seconds": state.get("style_avg_length_seconds"),
+        }
+        out = _run_agent_sync(reg, "script_agent", state, payload=payload)
+        update: dict[str, Any] = {"events": [out["next_event"]] if out["next_event"] else []}
+        # Same "only promote on an actual successful real-Agent result"
+        # guard as research_node — a Stub Agent's result has no "hook"
+        # key, so this can't clobber a value a test pre-seeded.
+        result = out.get("result") or {}
+        if "hook" in result:
+            update["script_hook"] = result.get("hook")
+            update["script_body"] = result.get("body")
+            update["script_cta"] = result.get("cta")
+            update["script_caption"] = result.get("caption")
+            update["script_title"] = result.get("title")
+            update["script_hashtags"] = result.get("hashtags")
+        return update
 
     def storyboard_node(state: StudioState) -> dict:
         # No dedicated Storyboard Agent in the registry (docs/roadmap.md

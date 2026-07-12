@@ -3,12 +3,13 @@
 Phase 1 scope (docs/roadmap.md 1.8) was exactly: projects, sources,
 agent_runs, agent_events, approvals. `research_notes` was added in Phase
 2.3 alongside the real Research Agent (agents/research_agent/agent.py),
-`style_profile` in Phase 3.1 alongside the style questionnaire — each
-the first table added incrementally as the feature that needs it landed,
-per the Phase 1 note below. The rest of docs/database.md's schema
-(ideas, scripts, storyboards, assets, videos, publications, memory_entries,
-prompt_library, favorite_tools, brand_assets) is still added incrementally
-in later phases as those features are built — not all at once here.
+`style_profile` in Phase 3.1 alongside the style questionnaire, `scripts`
+in Phase 3.2-3.4 alongside the real Script Agent — each the first table
+added incrementally as the feature that needs it landed, per the Phase 1
+note below. The rest of docs/database.md's schema (ideas, storyboards,
+assets, videos, publications, memory_entries, prompt_library,
+favorite_tools, brand_assets) is still added incrementally in later
+phases as those features are built — not all at once here.
 """
 
 from __future__ import annotations
@@ -49,6 +50,7 @@ class Project(Base):
     research_notes: Mapped[list["ResearchNote"]] = relationship(
         back_populates="project", cascade="all, delete-orphan"
     )
+    scripts: Mapped[list["Script"]] = relationship(back_populates="project", cascade="all, delete-orphan")
 
 
 class Source(Base):
@@ -153,3 +155,28 @@ class StyleProfile(Base):
     avg_length_seconds: Mapped[float | None] = mapped_column(Numeric)
     vocabulary_notes: Mapped[dict | None] = mapped_column(JSON)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
+
+
+class Script(Base):
+    """Persisted output of a Script Agent run (docs/database.md) — one
+    row per successful `status="success"` AgentOutput from
+    agents/script_agent/agent.py. `style_profile_id` is nullable: the
+    Script Agent works even with no style_profile yet (see that Agent's
+    module docstring), so a script written before the questionnaire was
+    ever run has nothing to point at."""
+
+    __tablename__ = "scripts"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"))
+    hook: Mapped[str | None] = mapped_column(Text)
+    body: Mapped[str | None] = mapped_column(Text)
+    cta: Mapped[str | None] = mapped_column(Text)
+    caption: Mapped[str | None] = mapped_column(Text)
+    title: Mapped[str | None] = mapped_column(Text)
+    hashtags: Mapped[list | None] = mapped_column(JSON)  # TEXT[] in docs/database.md — same JSON simplification
+    style_profile_id: Mapped[str | None] = mapped_column(ForeignKey("style_profile.id"))
+    version: Mapped[int] = mapped_column(default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    project: Mapped["Project"] = relationship(back_populates="scripts")

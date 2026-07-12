@@ -417,3 +417,84 @@ def test_knowledge_node_passes_research_output_to_real_agent(client, monkeypatch
     assert upsert_calls[0]["source_type"] == "github"
     assert upsert_calls[0]["source_url"] == "https://github.com/octocat/Hello-World"
     assert "source.ingested" in final_state["events"]
+
+
+def test_script_node_passes_research_and_style_fields_to_real_agent(client, monkeypatch):
+    """Phase 3.2-3.4 counterpart to the research_node/knowledge_node
+    wiring regression tests above: script_node must forward
+    research_summary/research_key_points (from research_node) and every
+    style_* field the caller seeded into the initial state into the
+    Script Agent's payload — nothing here should ever silently fall back
+    to the empty-payload {} default a Stub Agent would tolerate (see
+    _agent_event's docstring for the class of bug this guards against)."""
+
+    resp = client.post(
+        "/api/projects",
+        json={"source_type": "github", "source_url": "https://github.com/octocat/Hello-World"},
+    )
+    project = resp.json()
+
+    _mock_passing_score(monkeypatch)
+
+    async def _fake_research_run(self, input):
+        return AgentOutput(
+            status="success",
+            result={"summary": "A demo repo.", "key_points": ["one", "two"], "raw_text": "digest text"},
+            next_event="research.completed",
+        )
+
+    monkeypatch.setattr("agents.research_agent.agent.ResearchAgent.run", _fake_research_run)
+
+    received_inputs = []
+
+    async def _fake_script_run(self, input):
+        received_inputs.append(input)
+        return AgentOutput(
+            status="success",
+            result={
+                "hook": "h",
+                "body": "b",
+                "cta": "c",
+                "caption": "cap",
+                "title": "t",
+                "hashtags": ["#tag"],
+            },
+            next_event="script.drafted",
+        )
+
+    monkeypatch.setattr("agents.script_agent.agent.ScriptAgent.run", _fake_script_run)
+
+    registry = _all_stub_registry(exclude=frozenset({"research_agent", "script_agent"}))
+    registry.register("research_agent", lambda: agents.research_agent.agent.agent)
+    registry.register("script_agent", lambda: agents.script_agent.agent.agent)
+
+    graph = build_graph(registry=registry).compile(checkpointer=MemorySaver())
+    run_id = str(uuid.uuid4())
+    config = {"configurable": {"thread_id": run_id}}
+    final_state = graph.invoke(
+        {
+            "project_id": project["id"],
+            "run_id": run_id,
+            "source_type": project["source_type"],
+            "source_url": project["source_url"],
+            "events": [],
+            "style_tone_notes": "energetic and fast",
+            "style_opening_patterns": ["הי חברים תראו מה מצאתי"],
+            "style_closing_patterns": ["אהבתם, רוצים עוד? תעקבו"],
+            "style_avg_length_seconds": 37.5,
+        },
+        config=config,
+    )
+
+    assert len(received_inputs) == 1
+    payload = received_inputs[0].payload
+    assert payload["research_summary"] == "A demo repo."
+    assert payload["research_key_points"] == ["one", "two"]
+    assert payload["style_tone_notes"] == "energetic and fast"
+    assert payload["style_opening_patterns"] == ["הי חברים תראו מה מצאתי"]
+    assert payload["style_closing_patterns"] == ["אהבתם, רוצים עוד? תעקבו"]
+    assert payload["style_avg_length_seconds"] == 37.5
+
+    assert "script.drafted" in final_state["events"]
+    assert final_state["script_hook"] == "h"
+    assert final_state["script_hashtags"] == ["#tag"]

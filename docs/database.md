@@ -46,7 +46,7 @@ ideas (
   created_at
 )
 
-scripts (
+scripts (                    -- implemented Phase 3.2-3.4, apps/api/app/models.py's Script
   id UUID PK,
   project_id FK,
   hook TEXT,
@@ -54,8 +54,8 @@ scripts (
   cta TEXT,
   caption TEXT,
   title TEXT,
-  hashtags TEXT[],
-  style_profile_id FK,
+  hashtags TEXT[],           -- stored as JSON in code, same simplification as style_profile
+  style_profile_id FK,       -- nullable: Script Agent works even with no style_profile yet
   version INT,
   created_at
 )
