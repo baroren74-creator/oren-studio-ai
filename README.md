@@ -11,9 +11,14 @@ This is **not** a SaaS product. It is being built for one user. See
 
 ## Status
 
-**Phase 1 — Project Initialization.** The repository skeleton, standards,
-and planning docs are in place. No business logic has been written yet —
-see `docs/roadmap.md` for what's next.
+**Phase 3 — Script + Storyboard, in progress.** Phases 1 (skeleton) and 2
+(Research/Trend/Knowledge Agents, idea scoring) are done. Phase 3's
+`style_profile` questionnaire and a real Script Agent are done; a
+synchronous `POST /api/projects/{id}/run` endpoint wires the whole graph
+together end-to-end for the first time, with a matching "Run" button in
+`apps/web`. Next up: Prompt Library UI, the approval gate, and the
+Storyboard Agent — see `docs/roadmap.md` for the exact state of every
+item.
 
 ## Repository layout
 

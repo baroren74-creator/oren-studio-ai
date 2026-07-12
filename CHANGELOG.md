@@ -5,6 +5,41 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Phase 3.4.5: orchestrator wiring + apps/web visibility (v0, out-of-sequence)
+- `apps/api/app/services/orchestrator.py`: new `run_project()` — the
+  first thing in this repo that actually invokes
+  `workflows/graph.py`'s `build_graph()` from a real request. A
+  deliberate v0 shortcut (synchronous, in-process, `MemorySaver`
+  checkpointer) explicitly permitted by ADR-001, not the eventual
+  Redis-backed `services/orchestrator-worker`. Seeds the graph's initial
+  state from the current `style_profile` (Phase 3.1) and, on completion,
+  persists a `ResearchNote` (+ `idea_score`) and a `Script` (if the idea
+  wasn't rejected) via the existing `persist_research_note`/
+  `persist_script` service functions.
+- `apps/api/app/main.py`: now imports all 8 `agents/*/agent.py` modules
+  so they self-register on `core.registry.default_registry` at process
+  startup — previously nothing outside the test suite ever imported them
+  together, so the real registry was empty at runtime.
+- New route: `POST /api/projects/{id}/run` → `ProjectRunOut` (`run_id`,
+  `events`, `rejected`, `interrupted`, `idea_score`,
+  `research_note_id`, `script_id`, `script`). 404 for an unknown
+  project. Live-verified manually (real `alembic upgrade head`, real
+  `uvicorn`, real `curl`, real `gitingest` fetch of a public GitHub
+  repo, graceful LiteLLM failure with no API key configured) before
+  being committed.
+- `apps/web/app/projects/[id]/page.tsx`: added a "Run" button and a
+  result panel showing the idea score and, if produced, the script's
+  hook/body/cta/caption/title/hashtags — replacing the previously
+  always-empty timeline view with a real, visible result. Not the real
+  Storyboard UI (Phase 3.8) — a stopgap so there's something to see
+  before that phase exists. `apps/web/lib/api.ts` gained `runProject()`
+  and the `ProjectRun`/`ScriptResult` types.
+- `Makefile`: new `run-api`/`run-web` targets to run the real backend
+  and frontend (not just tests) locally.
+- Tests: `apps/api/tests/test_orchestrator.py` (6 cases). Full suite:
+  112 tests passing (`make test`). `apps/web`: `npx tsc --noEmit` and
+  `npm run build` both clean.
+
 ### Added — Phase 3.2-3.4: real Script Agent
 - `agents/script_agent/agent.py`: real logic replacing the Phase 1.18
   stub — one structured LLM call producing hook/body/cta/caption/title/

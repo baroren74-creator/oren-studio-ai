@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.deps import get_db, require_api_key
 from app.models import AgentEvent, AgentRun, Project
-from app.schemas import AgentEventOut, ProjectCreate, ProjectOut
+from app.schemas import AgentEventOut, ProjectCreate, ProjectOut, ProjectRunOut
+from app.services.orchestrator import ProjectNotFoundError, run_project
 
 router = APIRouter(prefix="/api/projects", tags=["projects"], dependencies=[Depends(require_api_key)])
 
@@ -47,3 +48,18 @@ def get_project_timeline(project_id: str, db: Session = Depends(get_db)) -> list
         select(AgentEvent).where(AgentEvent.run_id.in_(run_ids)).order_by(AgentEvent.created_at)
     ).all()
     return list(events)
+
+
+@router.post("/{project_id}/run", response_model=ProjectRunOut)
+def run_project_route(project_id: str, db: Session = Depends(get_db)) -> dict:
+    # See app.services.orchestrator's module docstring: this runs the
+    # full studio graph synchronously, inside this request — a
+    # deliberate v0 shortcut, not the eventual services/orchestrator-
+    # worker. Requires real ANTHROPIC_API_KEY/VOYAGE_API_KEY in the
+    # environment to produce real output; without them every real Agent
+    # call fails cleanly (status="failed", not a crash) and this
+    # endpoint still returns 200 with an empty script.
+    try:
+        return run_project(db, project_id)
+    except ProjectNotFoundError:
+        raise HTTPException(status_code=404, detail="project not found")

@@ -10,6 +10,15 @@ type (see `CONTRIBUTING.md`).
 POST   /api/projects                     create a project from a source
 GET    /api/projects/{id}
 GET    /api/projects/{id}/timeline       all agent_events, chronological
+POST   /api/projects/{id}/run            v0 synchronous graph run — done (Phase 3.4.5), see
+                                          apps/api/app/services/orchestrator.py's module docstring.
+                                          Runs the full studio graph in-request (LangGraph +
+                                          MemorySaver, no queue/retry — ADR-001 permits embedding
+                                          directly in apps/api; this is not the eventual
+                                          services/orchestrator-worker). Persists a ResearchNote
+                                          and, if the idea passed scoring, a Script. Returns
+                                          ProjectRunOut: run_id, events, rejected, interrupted,
+                                          idea_score, research_note_id, script_id, script.
 
 POST   /api/agents/{agent_name}/run      manual/debug run of a single agent
 GET    /api/agent-runs/{id}

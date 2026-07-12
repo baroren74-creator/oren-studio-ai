@@ -1,4 +1,4 @@
-.PHONY: help up down restart logs ps clean install lint format test migrate seed pre-commit
+.PHONY: help up down restart logs ps clean install lint format test migrate seed run-api run-web pre-commit
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
@@ -44,6 +44,12 @@ migrate: ## Run DB migrations against DATABASE_URL (apps/api/alembic)
 
 seed: ## Seed local DB with dev data (currently: style_profile v0, Phase 3.1)
 	PYTHONPATH="$(CURDIR):$(CURDIR)/packages/core:$(CURDIR)/workflows:$(CURDIR)/providers/llm:$(CURDIR)/packages/memory:$(CURDIR)/apps/api" python3 scripts/seed_style_profile.py
+
+run-api: ## Run apps/api for real (uvicorn, reload on) — needs ANTHROPIC_API_KEY/VOYAGE_API_KEY in .env for real Agent output, see apps/api/app/services/orchestrator.py
+	cd apps/api && PYTHONPATH="$(CURDIR):$(CURDIR)/packages/core:$(CURDIR)/workflows:$(CURDIR)/providers/llm:$(CURDIR)/packages/memory:$(CURDIR)/apps/api" python3 -m uvicorn app.main:app --reload --port 8000
+
+run-web: ## Run apps/web for real (Next.js dev server) — needs apps/api running (make run-api) at NEXT_PUBLIC_API_BASE_URL
+	cd apps/web && npm run dev
 
 pre-commit: ## Run pre-commit hooks against all files
 	pre-commit run --all-files

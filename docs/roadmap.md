@@ -316,6 +316,64 @@ in case scheduled/automated posting is wanted later.
     `test_script_node_passes_research_and_style_fields_to_real_agent`
     (payload wiring end-to-end, including style_* fields). Full suite:
     106 tests passing (`make test`).
+3.4.5 Orchestrator wiring + apps/web visibility (v0, out-of-sequence).
+    **Done.** Not on the original roadmap in this order — added because
+    after 3.1–3.4 shipped, nothing in `apps/api` actually ran the graph:
+    no orchestrator-worker, no Agent self-registration at runtime, no
+    trigger endpoint. Every prior phase's tests exercised
+    `workflows/graph.py` directly; a real request never touched it.
+    Building this was a precondition for either "run the pipeline for
+    real" or "show it in apps/web" to mean anything, so it came first.
+
+    `apps/api/app/services/orchestrator.py`'s `run_project()`: a
+    synchronous, single-process graph run — `build_graph().compile()`
+    with a `MemorySaver` checkpointer, invoked in-request. Permitted
+    explicitly by ADR-001 ("LangGraph embedded directly inside apps/api
+    / services/orchestrator-worker") as the `apps/api` half of that
+    either/or, not a violation of it. This is a deliberate v0 shortcut:
+    synchronous (the request blocks until the graph finishes), no queue,
+    no retry — the real `services/orchestrator-worker` (Redis-backed,
+    async) is still on the roadmap and this does not replace it. Reads
+    the current `style_profile` (3.1) into the graph's initial state,
+    and on completion persists a `ResearchNote` (+ `idea_score`, if the
+    idea wasn't rejected) and a `Script` (if one was drafted) using the
+    same `persist_research_note`/`persist_script` service functions
+    Phase 2/3 already built — this endpoint is a caller of those, not a
+    new persistence path.
+
+    `apps/api/app/main.py` now imports all 8 `agents/*/agent.py` modules
+    so they self-register on `core.registry.default_registry` at process
+    startup (each module already did this as an import side-effect; the
+    gap was that nothing outside tests ever imported them together).
+
+    Route: `POST /api/projects/{id}/run` -> `ProjectRunOut` (`run_id`,
+    `events`, `rejected`, `interrupted`, `idea_score`,
+    `research_note_id`, `script_id`, `script`). 404 if the project
+    doesn't exist. Requires real `ANTHROPIC_API_KEY`/`VOYAGE_API_KEY` in
+    the environment for real Agent output — without them, real Agents
+    fail cleanly (`status="failed"`) and this still returns 200 with an
+    empty script, same "skip, don't crash" convention as everywhere
+    else. Live-verified manually (real `alembic upgrade head`, real
+    `uvicorn`, real `curl`, real `gitingest` fetch of a public repo,
+    graceful LiteLLM failure with no key configured) before being
+    committed.
+
+    `apps/web/app/projects/[id]/page.tsx`: added a "Run" button calling
+    the new endpoint and a result panel rendering the idea score and,
+    if produced, the script's hook/body/cta/caption/title/hashtags —
+    replacing what was a read-only, always-empty-in-practice timeline
+    view with something that shows a real result. Deliberately not the
+    real Storyboard UI (3.8) — this is a stopgap so there's something to
+    see before that phase, not a replacement for it.
+    `apps/web/lib/api.ts` gained `runProject()` and the `ProjectRun`/
+    `ScriptResult` types.
+
+    Tests: `apps/api/tests/test_orchestrator.py` (6 cases — missing
+    project, full persistence round-trip, rejected-idea path,
+    style_profile fields threaded into the Script Agent's payload, the
+    route's 200 and 404 paths). Full suite: 112 tests passing
+    (`make test`). `apps/web`: `npx tsc --noEmit` and `npm run build`
+    both clean.
 3.5 Prompt Library UI (CRUD + versioning).
 3.6 Approval Gate #1: review/edit script before continuing.
 3.7 Storyboard Agent: **custom LLM-prompting module** (structured JSON:

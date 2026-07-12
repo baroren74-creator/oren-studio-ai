@@ -49,10 +49,34 @@ export type AgentRun = {
   finished_at: string | null;
 };
 
+export type ScriptResult = {
+  hook: string | null;
+  body: string | null;
+  cta: string | null;
+  caption: string | null;
+  title: string | null;
+  hashtags: string[] | null;
+};
+
+// Response shape for POST /api/projects/{id}/run — see
+// apps/api/app/services/orchestrator.py's module docstring for what
+// this endpoint actually does (a synchronous v0 graph run).
+export type ProjectRun = {
+  run_id: string;
+  events: string[];
+  rejected: boolean;
+  interrupted: boolean;
+  idea_score: number | null;
+  research_note_id: string | null;
+  script_id: string | null;
+  script: ScriptResult | null;
+};
+
 export const api = {
   createProject: (body: { title?: string; source_type: string; source_url: string }) =>
     request<Project>("/api/projects", { method: "POST", body: JSON.stringify(body) }),
   getProject: (id: string) => request<Project>(`/api/projects/${id}`),
   getProjectTimeline: (id: string) => request<AgentEvent[]>(`/api/projects/${id}/timeline`),
   listAgentRuns: () => request<AgentRun[]>("/api/agent-runs"),
+  runProject: (id: string) => request<ProjectRun>(`/api/projects/${id}/run`, { method: "POST" }),
 };

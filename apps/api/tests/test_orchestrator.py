@@ -1,0 +1,255 @@
+"""app/services/orchestrator.py — the first real caller of
+workflows/graph.py's build_graph() outside of a test. See that module's
+docstring for why this is a deliberate v0 (synchronous, in-process,
+MemorySaver-checkpointed) shortcut, not the eventual services/
+orchestrator-worker.
+
+Real Agent .run methods are mocked (same "patch where it's used"
+convention as apps/api/tests/test_smoke_e2e.py) — no real network/LLM
+calls in this suite. A live, unmocked smoke check (real gitingest fetch,
+graceful failure with no API key configured) was run manually against a
+throwaway SQLite DB via `uvicorn` during development; not part of the
+automated suite since it depends on github.com being reachable.
+"""
+
+from __future__ import annotations
+
+from unittest.mock import AsyncMock
+
+import agents.research_agent.agent
+import agents.script_agent.agent
+from core.registry import AgentRegistry
+from core.schemas.agent import AgentOutput
+from core.stub_agent import StubAgent
+
+from app.models import Project, ResearchNote, Script
+from app.services.orchestrator import ProjectNotFoundError, run_project
+from app.services.style_profile import create_style_profile
+
+_STUB_NEXT_EVENTS = {
+    "knowledge_agent": "source.ingested",
+    "recording_agent": "recording.completed",
+    "video_agent": "video.rendered",
+    "voice_agent": "voice.completed",
+    "publishing_agent": "final_review.requested",
+}
+
+
+def _make_project(db, **kwargs) -> Project:
+    defaults = dict(title="Test project", status="draft", source_type="github", source_url="https://github.com/x/y")
+    defaults.update(kwargs)
+    project = Project(**defaults)
+    db.add(project)
+    db.commit()
+    db.refresh(project)
+    return project
+
+
+def _registry_with_real_research_and_script() -> AgentRegistry:
+    """Every node stubbed except research_agent/script_agent, which use
+    the real modules (their .run methods get monkeypatched per-test) —
+    mirrors apps/api/tests/test_smoke_e2e.py's `_all_stub_registry`."""
+    registry = AgentRegistry()
+    for name, next_event in _STUB_NEXT_EVENTS.items():
+        stub = StubAgent(name=name, next_event=next_event)
+        registry.register(name, lambda stub=stub: stub)
+    registry.register("research_agent", lambda: agents.research_agent.agent.agent)
+    registry.register("script_agent", lambda: agents.script_agent.agent.agent)
+    return registry
+
+
+def test_run_project_raises_for_missing_project(client):
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        try:
+            run_project(db, "does-not-exist")
+            assert False, "expected ProjectNotFoundError"
+        except ProjectNotFoundError:
+            pass
+    finally:
+        db.close()
+
+
+def test_run_project_persists_research_and_script(client, monkeypatch):
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        project = _make_project(db)
+
+        monkeypatch.setattr(
+            "agents.research_agent.agent.ResearchAgent.run",
+            AsyncMock(
+                return_value=AgentOutput(
+                    status="success",
+                    result={"summary": "A demo repo.", "key_points": ["one", "two"], "raw_text": "digest"},
+                    next_event="research.completed",
+                )
+            ),
+        )
+        monkeypatch.setattr(
+            "agents.script_agent.agent.ScriptAgent.run",
+            AsyncMock(
+                return_value=AgentOutput(
+                    status="success",
+                    result={
+                        "hook": "h",
+                        "body": "b",
+                        "cta": "c",
+                        "caption": "cap",
+                        "title": "t",
+                        "hashtags": ["#tag"],
+                    },
+                    next_event="script.drafted",
+                )
+            ),
+        )
+        monkeypatch.setattr("workflows.graph.score_idea", lambda **kwargs: __import__("types").SimpleNamespace(
+            total=100.0, breakdown={"novelty": 25, "audience_relevance": 25, "source_reliability": 25, "visual_potential": 25}
+        ))
+
+        result = run_project(db, project.id, registry=_registry_with_real_research_and_script())
+
+        assert result["rejected"] is False
+        assert result["idea_score"] == 100.0
+        assert result["script"]["hook"] == "h"
+        assert result["research_note_id"] is not None
+        assert result["script_id"] is not None
+
+        note = db.get(ResearchNote, result["research_note_id"])
+        assert note.summary == "A demo repo."
+        assert note.interest_score == 100.0
+
+        script = db.get(Script, result["script_id"])
+        assert script.hook == "h"
+        assert script.hashtags == ["#tag"]
+    finally:
+        db.close()
+
+
+def test_run_project_rejected_idea_persists_research_but_no_script(client, monkeypatch):
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        project = _make_project(db)
+
+        monkeypatch.setattr(
+            "agents.research_agent.agent.ResearchAgent.run",
+            AsyncMock(
+                return_value=AgentOutput(
+                    status="success",
+                    result={"summary": "A demo repo.", "key_points": [], "raw_text": "digest"},
+                    next_event="research.completed",
+                )
+            ),
+        )
+        monkeypatch.setattr("workflows.graph.score_idea", lambda **kwargs: __import__("types").SimpleNamespace(
+            total=10.0, breakdown={"novelty": 5, "audience_relevance": 5, "source_reliability": 0, "visual_potential": 0}
+        ))
+
+        result = run_project(db, project.id, registry=_registry_with_real_research_and_script())
+
+        assert result["rejected"] is True
+        assert result["idea_score"] == 10.0
+        assert result["script"] is None
+        assert result["script_id"] is None
+        assert result["research_note_id"] is not None
+    finally:
+        db.close()
+
+
+def test_run_project_seeds_style_profile_into_script_payload(client, monkeypatch):
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        project = _make_project(db)
+        profile = create_style_profile(
+            db, tone_notes="energetic", opening_patterns=["הי חברים"], avg_length_seconds=37.5
+        )
+
+        monkeypatch.setattr(
+            "agents.research_agent.agent.ResearchAgent.run",
+            AsyncMock(
+                return_value=AgentOutput(
+                    status="success", result={"summary": "A demo repo.", "key_points": []}, next_event="research.completed"
+                )
+            ),
+        )
+        monkeypatch.setattr("workflows.graph.score_idea", lambda **kwargs: __import__("types").SimpleNamespace(
+            total=100.0, breakdown={}
+        ))
+
+        received = []
+
+        async def _fake_script_run(self, input):
+            received.append(input)
+            return AgentOutput(
+                status="success",
+                result={"hook": "h", "body": "b", "cta": "c", "caption": "cap", "title": "t", "hashtags": []},
+                next_event="script.drafted",
+            )
+
+        monkeypatch.setattr("agents.script_agent.agent.ScriptAgent.run", _fake_script_run)
+
+        result = run_project(db, project.id, registry=_registry_with_real_research_and_script())
+
+        assert len(received) == 1
+        assert received[0].payload["style_tone_notes"] == "energetic"
+        assert received[0].payload["style_opening_patterns"] == ["הי חברים"]
+        assert received[0].payload["style_avg_length_seconds"] == 37.5
+
+        script = db.get(Script, result["script_id"])
+        assert script.style_profile_id == profile.id
+    finally:
+        db.close()
+
+
+def test_run_route_returns_200_and_persists(client, monkeypatch):
+    resp = client.post(
+        "/api/projects", json={"source_type": "github", "source_url": "https://github.com/x/y"}
+    )
+    project = resp.json()
+
+    monkeypatch.setattr(
+        "agents.research_agent.agent.ResearchAgent.run",
+        AsyncMock(
+            return_value=AgentOutput(
+                status="success", result={"summary": "A demo repo.", "key_points": []}, next_event="research.completed"
+            )
+        ),
+    )
+    monkeypatch.setattr(
+        "agents.script_agent.agent.ScriptAgent.run",
+        AsyncMock(
+            return_value=AgentOutput(
+                status="success",
+                result={"hook": "h", "body": "b", "cta": "c", "caption": "cap", "title": "t", "hashtags": []},
+                next_event="script.drafted",
+            )
+        ),
+    )
+    monkeypatch.setattr("workflows.graph.score_idea", lambda **kwargs: __import__("types").SimpleNamespace(
+        total=100.0, breakdown={}
+    ))
+    # The route uses the real default_registry, which agents/*/agent.py
+    # modules populate as an import side-effect when apps.api.app.main
+    # loads (see that module's comment) — the client fixture already
+    # imports app.main, so the registry is populated by the time this
+    # request runs. This deliberately does NOT swap in an isolated
+    # registry, unlike the direct-service tests above: it's exercising
+    # exactly what a real request would hit.
+    resp = client.post(f"/api/projects/{project['id']}/run")
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["idea_score"] == 100.0
+    assert body["script"]["hook"] == "h"
+
+
+def test_run_route_returns_404_for_missing_project(client):
+    resp = client.post("/api/projects/does-not-exist/run")
+    assert resp.status_code == 404

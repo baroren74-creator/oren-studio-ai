@@ -86,3 +86,28 @@ class StyleProfileOut(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ScriptResultOut(BaseModel):
+    hook: str | None
+    body: str | None
+    cta: str | None
+    caption: str | None
+    title: str | None
+    hashtags: list[str] | None
+
+
+class ProjectRunOut(BaseModel):
+    """Response for `POST /api/projects/{id}/run` — see
+    app.services.orchestrator's module docstring for what this endpoint
+    actually does (a synchronous, single-process, v0 graph run, not the
+    eventual services/orchestrator-worker)."""
+
+    run_id: str
+    events: list[str]
+    rejected: bool
+    interrupted: bool
+    idea_score: float | None
+    research_note_id: str | None
+    script_id: str | None
+    script: ScriptResultOut | None
