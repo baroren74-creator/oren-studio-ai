@@ -23,6 +23,13 @@ Role = Literal["system", "user", "assistant"]
 # OREN_STUDIO_LLM_MODEL env var without touching any Agent code.
 DEFAULT_MODEL = os.environ.get("OREN_STUDIO_LLM_MODEL", "anthropic/claude-3-5-sonnet-20241022")
 
+# Voyage AI — Anthropic's recommended embedding partner for RAG use
+# alongside Claude (Oren-approved choice, Phase 2.8: no single obvious
+# "best" embedding provider the way Claude was an obvious default LLM
+# choice, so this was flagged as a real decision rather than picked
+# silently). Override via OREN_STUDIO_EMBEDDING_MODEL.
+DEFAULT_EMBEDDING_MODEL = os.environ.get("OREN_STUDIO_EMBEDDING_MODEL", "voyage/voyage-3-lite")
+
 
 @dataclass
 class LLMMessage:
@@ -36,6 +43,14 @@ class LLMResponse:
     model: str
     input_tokens: int
     output_tokens: int
+    cost_usd: float
+
+
+@dataclass
+class EmbeddingResponse:
+    vectors: list[list[float]]  # one per input string, same order
+    model: str
+    tokens_used: int
     cost_usd: float
 
 
@@ -83,5 +98,43 @@ def complete(
         model=response.model,
         input_tokens=getattr(usage, "prompt_tokens", 0) or 0,
         output_tokens=getattr(usage, "completion_tokens", 0) or 0,
+        cost_usd=cost_usd,
+    )
+
+
+def embed(texts: list[str], *, model: str | None = None) -> EmbeddingResponse:
+    """Batch-embed a list of strings via LiteLLM (Voyage AI by default —
+    see DEFAULT_EMBEDDING_MODEL). Used by packages/memory's chunk->embed->
+    upsert->query layer (docs/decisions.md ADR-002) — nothing outside
+    providers/llm imports litellm directly for embeddings either, same
+    "one place" rule as complete()."""
+
+    import litellm
+
+    try:
+        response = litellm.embedding(model=model or DEFAULT_EMBEDDING_MODEL, input=texts)
+    except Exception as exc:  # noqa: BLE001 — deliberately broad, re-raised as our own type
+        raise LLMError(f"embedding call failed ({model or DEFAULT_EMBEDDING_MODEL}): {exc}") from exc
+
+    def _vector(item) -> list[float]:
+        # LiteLLM's embedding response items are OpenAI-shaped, but not
+        # strictly typed (plain dict in practice) — handle both dict and
+        # attribute access defensively rather than assuming one.
+        if isinstance(item, dict):
+            return item["embedding"]
+        return item.embedding
+
+    vectors = [_vector(item) for item in response.data]
+    usage = response.usage
+    cost_usd = 0.0
+    try:
+        cost_usd = litellm.completion_cost(completion_response=response)
+    except Exception:  # noqa: BLE001 — cost tracking is best-effort, never fatal
+        pass
+
+    return EmbeddingResponse(
+        vectors=vectors,
+        model=response.model or (model or DEFAULT_EMBEDDING_MODEL),
+        tokens_used=getattr(usage, "prompt_tokens", 0) or getattr(usage, "total_tokens", 0) or 0,
         cost_usd=cost_usd,
     )

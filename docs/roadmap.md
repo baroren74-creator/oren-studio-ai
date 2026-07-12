@@ -162,7 +162,56 @@ in case scheduled/automated posting is wanted later.
     persistence)).
 2.8 Knowledge Agent: chunking + embedding — **custom thin layer**, not
     LlamaIndex/Haystack (see ADR-002) — writes to Qdrant `knowledge_docs`.
-2.9 Knowledge Agent: semantic search endpoint.
+    **Done.** `packages/memory` (`chunking.py`'s `chunk_text()` — word-
+    count chunks with overlap, no tokenizer dependency; `store.py`'s
+    `MemoryStore` — thin qdrant-client wrapper, `upsert_document()`/
+    `search()`/`delete_source()`). Embeddings via `providers/llm`'s new
+    `embed()` (Voyage AI, Oren-approved — no prior doc specified an
+    embedding provider; paired through LiteLLM same as the LLM provider).
+    `agents/knowledge_agent/agent.py` replaces its Phase 1.18 stub: reads
+    `payload.text`/`source_id`/`project_id`/`source_type`/`source_url`,
+    chunks + embeds + upserts, emits `source.ingested`; skips (no event)
+    when there's no text to index, same "skip, don't crash" convention as
+    Research Agent. `workflows/graph.py`'s `knowledge_node` now builds
+    that payload from `StudioState.research_raw_text` (a new field —
+    Research Agent's result now includes `raw_text`, the full digest/
+    transcript, not just the LLM summary) — this is the same class of fix
+    as 2.3's research_node payload bug: a Stub Agent ignoring its input
+    hid a wiring gap that only broke once real logic depended on it, so
+    `source.ingested` no longer fires unconditionally.
+
+    `source_id` is currently `run_id` (`agent_runs.id`, a real Postgres
+    row) rather than a real `sources.id` — there's no live orchestrator-
+    worker persisting `sources` rows yet (same "not built yet" gap noted
+    in `apps/api/app/services/research.py`'s docstring for
+    `research_notes`). ADR-008's point-ID requirement is satisfied via a
+    deterministic derivation (`uuid5(source_id, chunk_index)`, since one
+    row chunks into N vectors) rather than literal ID equality — see
+    `packages/memory/memory/store.py`'s module docstring. Revisit once
+    Source persistence is wired to a real orchestrator.
+
+    Tests: `packages/memory/tests/` (chunking edge cases; store round-
+    trip/project_id filtering/idempotent re-upsert/delete, against real
+    qdrant-client embedded-mode, embeddings mocked), `providers/llm/
+    tests/test_client.py` (`embed()`, mocked at the litellm boundary),
+    `agents/knowledge_agent/tests/test_agent.py` (skip/fail/success paths,
+    `_build_store` mocked), `apps/api/tests/test_smoke_e2e.py`'s
+    `test_knowledge_node_passes_research_output_to_real_agent` (payload
+    wiring end-to-end) and updated
+    `test_low_score_idea_is_rejected_before_final_review` (event list no
+    longer includes `source.ingested` for a skipped run).
+2.9 Knowledge Agent: semantic search endpoint. **Done.**
+    `GET /api/knowledge/search?q=...&project_id=...&limit=...`
+    (`apps/api/app/routers/knowledge.py`, `app/services/knowledge.py`).
+    Returns Qdrant's own payload (text/score/source metadata) directly
+    rather than the "Qdrant + Postgres hydrate" full version `docs/
+    api.md` describes — hydration needs a real `sources` table row to
+    hydrate *from*, which doesn't exist yet (see 2.8's note above); this
+    is the same incremental-persistence pattern as `research_notes`,
+    just further along the "not built yet" chain. Revisit this route the
+    same day Source persistence lands. 503 (not 500/4xx) on a down/
+    unreachable Qdrant — a service dependency failure, not a client
+    error. Tests: `apps/api/tests/test_knowledge_search.py`.
 2.10 Trend Agent v1–v3: GitHub Trending, Hacker News, Product Hunt (free
      sources first). **v1 (GitHub Trending) done** —
      `agents/trend_agent/github_trending_source.py` scrapes

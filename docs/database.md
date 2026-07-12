@@ -194,6 +194,16 @@ brand_assets (
 Rebuilding any Qdrant collection from Postgres must always be possible —
 if it isn't, that's a bug (ADR-008).
 
+`knowledge_docs` is implemented (Phase 2.8, `packages/memory`). Two notes
+on how "every point ID = a Postgres row ID" plays out once chunking is
+involved, and while `sources` rows aren't persisted yet — see
+`docs/agents.md`'s Knowledge Agent section for the full reasoning:
+point IDs are `uuid5(source_id, chunk_index)` (deterministic, since one
+row chunks into N vectors, not literal equality), and `source_id` is
+currently `agent_runs.id` rather than `sources.id` (no live orchestrator-
+worker persists `sources` rows yet). Both are pragmatic stand-ins to
+revisit together once Source persistence lands.
+
 ## Migrations
 
 Alembic, linear and ordered, one direction. Never edit an already-applied

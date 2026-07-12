@@ -1,3 +1,3 @@
-from llm_provider.client import LLMError, LLMMessage, LLMResponse, complete
+from llm_provider.client import EmbeddingResponse, LLMError, LLMMessage, LLMResponse, complete, embed
 
-__all__ = ["LLMError", "LLMMessage", "LLMResponse", "complete"]
+__all__ = ["LLMError", "LLMMessage", "LLMResponse", "EmbeddingResponse", "complete", "embed"]

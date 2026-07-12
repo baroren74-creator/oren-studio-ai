@@ -1,0 +1,16 @@
+[project]
+name = "oren-studio-memory"
+version = "0.1.0"
+description = "Chunk -> embed -> upsert -> query layer over qdrant-client (docs/decisions.md ADR-002: custom ~300-line module, not LlamaIndex/Haystack)"
+requires-python = ">=3.11"
+dependencies = [
+    "qdrant-client>=1.9",
+    "oren-studio-providers-llm",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

@@ -18,7 +18,9 @@ POST   /api/approvals/{id}/approve
 POST   /api/approvals/{id}/reject
 POST   /api/approvals/{id}/request-edit  {notes}
 
-GET    /api/knowledge/search?q=...       semantic search (Qdrant + Postgres hydrate)
+GET    /api/knowledge/search?q=...       semantic search — done (Phase 2.9), currently returns Qdrant's
+                                          own payload, not yet Postgres-hydrated (no sources rows persisted
+                                          yet — see docs/agents.md's Knowledge Agent section)
 POST   /api/prompt-library
 GET    /api/style-profile/current
 ```
@@ -48,7 +50,7 @@ emits must appear here.
 
 ```
 trend.discovered         → Trend Agent — not part of the per-project pipeline below, see docs/agents.md
-source.ingested
+source.ingested          → Knowledge Agent — chunks/embeds/upserts into Qdrant, see docs/agents.md
 research.completed
 idea.scored              → below threshold: idea.rejected (stops here, see ADR-003)
 script.drafted

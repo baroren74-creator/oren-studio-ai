@@ -12,7 +12,14 @@ import pytest
 
 API_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = API_ROOT.parents[1]
-for p in (API_ROOT, REPO_ROOT / "packages" / "core", REPO_ROOT / "workflows", REPO_ROOT):
+for p in (
+    API_ROOT,
+    REPO_ROOT / "packages" / "core",
+    REPO_ROOT / "workflows",
+    REPO_ROOT / "providers" / "llm",
+    REPO_ROOT / "packages" / "memory",
+    REPO_ROOT,
+):
     sys.path.insert(0, str(p))
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_oren_studio.db")

@@ -11,6 +11,7 @@ dependencies = [
     "pydantic-settings>=2.4",
     "oren-studio-core",
     "oren-studio-workflows",
+    "oren-studio-memory",
 ]
 
 [project.optional-dependencies]

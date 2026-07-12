@@ -51,3 +51,13 @@ class AgentRunOut(BaseModel):
     finished_at: datetime | None
 
     model_config = {"from_attributes": True}
+
+
+class KnowledgeSearchResultOut(BaseModel):
+    """One semantic-search hit — see app.services.knowledge's module
+    docstring for why this is Qdrant's own payload rather than a
+    Postgres-hydrated row (Source persistence isn't wired up yet)."""
+
+    text: str
+    score: float
+    payload: dict

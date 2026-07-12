@@ -48,7 +48,7 @@ Orchestrator code.
 |---|---|---|---|
 | Research Agent | `agents/research_agent` | Finds sources, reads documentation, summarizes, understands the underlying technology, finds the *original* source. | `research.completed` |
 | Trend Agent | `agents/trend_agent` | Discovers new things: GitHub Trending (v1, done), Hacker News, Product Hunt, Reddit, AI news, Twitter/X (deferred), YouTube, blogs. Not a `workflows/graph.py` node — runs independent of any project (`ideas.project_id` is nullable), triggered separately, not per-project. | `trend.discovered`, feeds the Idea Backlog |
-| Knowledge Agent | `agents/knowledge_agent` | Learns documentation/projects, indexes everything to Qdrant, answers from accumulated knowledge. | `source.ingested` |
+| Knowledge Agent | `agents/knowledge_agent` | Chunks + embeds + indexes the Research Agent's raw digest/transcript text into Qdrant's `knowledge_docs` collection via `packages/memory` (Phase 2.8, done — see the section below). Semantic search (`GET /api/knowledge/search`) is a separate `apps/api` route, not this Agent (Phase 2.9, done). | `source.ingested` |
 | Script Agent | `agents/script_agent` | Writes Hook, Body, CTA, Caption, Title, Hashtags — in Oren's style (`style_profile`). | `script.drafted` |
 | Recording Agent | `agents/recording_agent` | v0: manual upload. Later: drives an Avatar provider (MuseTalk/LivePortrait). | `recording.completed` |
 | Video Agent | `agents/video_agent` | Cuts, zooms, captions, B-roll/screenshot overlay, cursor highlight, thumbnail. | `video.rendered`, `captions.generated`, `thumbnail.generated` |
@@ -96,3 +96,52 @@ The score is persisted onto the `research_notes` row the Research Agent
 already wrote (`interest_score`/`scored_by` columns,
 `apps/api/app/services/research.py`'s `update_idea_score()`) — not a new
 row, per that module's original note that this UPDATE would come later.
+
+## Knowledge Agent (Phase 2.8/2.9 — implemented)
+
+`packages/memory` is the ADR-002-mandated "custom thin layer" (chunk ->
+embed -> upsert -> query, not LlamaIndex/Haystack): `chunking.py`'s
+`chunk_text()` splits on word count with overlap (no tokenizer
+dependency — good enough for this project's known source types), and
+`store.py`'s `MemoryStore` wraps `qdrant-client` directly (embedded local
+mode via `path=`, or a real server via `url=`/`api_key=`).
+
+Embeddings go through `providers/llm`'s `embed()` — Voyage AI
+(`voyage/voyage-3-lite` by default), routed through LiteLLM the same way
+completions are. No prior doc specified an embedding provider; Voyage
+was chosen with Oren's explicit approval as Anthropic's recommended RAG
+embedding partner.
+
+`agents/knowledge_agent/agent.py` expects `payload.text` (the source's
+full raw content), `payload.source_id`, `payload.project_id`,
+`payload.source_type`, `payload.source_url`. No text -> `status="skipped"`,
+`next_event=None` (same convention as Research Agent: an unsupported
+source type or an upstream fetch/LLM failure means there's nothing to
+index, not a failure of this Agent). `workflows/graph.py`'s
+`knowledge_node` builds that payload from `StudioState.research_raw_text`
+— Research Agent's result now includes `raw_text` (the full digest/
+transcript) alongside its LLM `summary`, specifically so Knowledge Agent
+has something to index that isn't just the human-facing summary.
+
+**Point IDs and `source_id` (ADR-008):** every Qdrant point should map to
+a Postgres row ID. Chunking makes that literal for one row impossible (N
+chunks, one row), so `MemoryStore` derives each point's ID deterministically
+as `uuid5(source_id, chunk_index)` — re-ingesting the same `source_id`
+always reproduces the same point IDs (upsert overwrites in place, nothing
+duplicates), and the payload always carries `source_id` for tracing a hit
+back to its origin. Separately, `source_id` itself is currently `run_id`
+(`agent_runs.id`), not a real `sources.id` — there's no live orchestrator-
+worker persisting `sources` rows yet (the same "not built yet" gap
+`apps/api/app/services/research.py` already notes for `research_notes`).
+Both of these are pragmatic, documented stand-ins to revisit together
+once Source persistence exists — see `packages/memory/memory/store.py`'s
+module docstring and `workflows/graph.py`'s `knowledge_node` comment.
+
+**Semantic search** (`GET /api/knowledge/search?q=...&project_id=...&limit=...`,
+`apps/api/app/routers/knowledge.py`) returns Qdrant's own payload
+(text/score/source metadata) directly, not the "Qdrant + Postgres
+hydrate" version `docs/api.md`'s route comment describes — hydration
+needs a real `sources` row to hydrate *from*, which doesn't exist yet
+(same gap as above). Returns 503 (not 500/4xx) when the store is
+unreachable — a dependency failure, not something the client can fix by
+retrying differently.

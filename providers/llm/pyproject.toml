@@ -1,11 +1,14 @@
 [project]
 name = "oren-studio-providers-llm"
-version = "0.1.0"
-description = "LLM provider abstraction via LiteLLM — see docs/decisions.md ADR (LiteLLM adoption) and docs/open-source-landscape.md section 2"
+version = "0.2.0"
+description = "LLM + embedding provider abstraction via LiteLLM (Claude for completions, Voyage AI for embeddings) — see docs/decisions.md ADR (LiteLLM adoption) and docs/open-source-landscape.md section 2"
 requires-python = ">=3.11"
 dependencies = [
     "litellm>=1.50",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
 
 [build-system]
 requires = ["setuptools>=68"]

@@ -42,6 +42,7 @@ class StudioState(TypedDict, total=False):
     source_url: str | None
     research_summary: str | None
     research_key_points: list[str] | None
+    research_raw_text: str | None
     events: Annotated[list[str], add]
     idea_score: float
     idea_score_breakdown: dict[str, int] | None
@@ -123,10 +124,27 @@ def build_graph(registry: AgentRegistry | None = None):
         if "summary" in result:
             update["research_summary"] = result.get("summary")
             update["research_key_points"] = result.get("key_points")
+            update["research_raw_text"] = result.get("raw_text")
         return update
 
     def knowledge_node(state: StudioState) -> dict:
-        return _agent_event(reg, "knowledge_agent", state)
+        # Phase 2.8: Knowledge Agent indexes the Research Agent's raw
+        # digest/transcript text into Qdrant (packages/memory). `source_id`
+        # is `run_id` (agent_runs.id, a real Postgres row) as a pragmatic
+        # stand-in for `sources.id` — there's no live orchestrator-worker
+        # persisting a `sources` row yet (same gap noted in apps/api/app/
+        # services/research.py's docstring), and MemoryStore's deterministic
+        # point-ID scheme (ADR-008, packages/memory/memory/store.py) only
+        # needs a stable, traceable ID, not specifically that table. Revisit
+        # once Source persistence is wired to a real orchestrator.
+        payload = {
+            "source_id": state["run_id"],
+            "text": state.get("research_raw_text"),
+            "project_id": state["project_id"],
+            "source_type": state.get("source_type"),
+            "source_url": state.get("source_url"),
+        }
+        return _agent_event(reg, "knowledge_agent", state, payload=payload)
 
     def idea_scoring_node(state: StudioState) -> dict:
         # Phase 2.6/2.7 (docs/agents.md 'Idea scoring rubric', ADR-003):

@@ -9,6 +9,12 @@ Phase 2.5: real logic for YouTube sources — fetch a transcript
 and docs/decisions.md ADR-013 for why this replaced the originally-
 specced faster-whisper approach) and summarize it the same way.
 
+Phase 2.8: result now includes `raw_text` (the full digest/transcript
+text, not just the LLM summary) alongside `summary`/`key_points` — this
+is what the Knowledge Agent (agents/knowledge_agent) chunks, embeds, and
+indexes into Qdrant. See workflows/graph.py's research_node/knowledge_node
+for how it's threaded through StudioState.
+
 Remaining source types (articles, tweets) are not implemented yet and
 return status="skipped" rather than pretending to handle them.
 
@@ -38,7 +44,7 @@ from agents.research_agent.github_source import GitHubSourceError, fetch_repo_di
 from agents.research_agent.youtube_source import YouTubeSourceError, fetch_video_transcript
 
 NAME = "research_agent"
-VERSION = "0.3.0"  # bumped for Phase 2.5 (YouTube support)
+VERSION = "0.4.0"  # bumped: result now includes raw_text for the Knowledge Agent (Phase 2.8)
 
 SUPPORTED_SOURCE_TYPES = ("github", "youtube")
 
@@ -144,7 +150,16 @@ class ResearchAgent:
             return _summarize(
                 system_prompt=GITHUB_SYSTEM_PROMPT,
                 prompt_text=digest.as_prompt_text(),
-                extra_result={"source_url": source_url, "repo_summary": digest.summary},
+                extra_result={
+                    "source_url": source_url,
+                    "repo_summary": digest.summary,
+                    # Full digest text, not just the LLM's summary — this is
+                    # what the Knowledge Agent (agents/knowledge_agent)
+                    # chunks/embeds/indexes into Qdrant (Phase 2.8); the LLM
+                    # summary above is for the human-facing research note,
+                    # not what gets searched later.
+                    "raw_text": digest.as_prompt_text(),
+                },
             )
 
         # source_type == "youtube" — fetch_video_transcript is a regular
@@ -164,6 +179,9 @@ class ResearchAgent:
                 "video_id": transcript.video_id,
                 "transcript_language": transcript.language_code,
                 "transcript_is_generated": transcript.is_generated,
+                # See the GitHub branch's comment above — same reasoning,
+                # this is what the Knowledge Agent indexes.
+                "raw_text": transcript.as_prompt_text(),
             },
         )
 

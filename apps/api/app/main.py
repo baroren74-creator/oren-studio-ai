@@ -10,13 +10,14 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from app.routers import agent_runs, projects
+from app.routers import agent_runs, knowledge, projects
 from app.ws import router as ws_router
 
 app = FastAPI(title="Oren Studio AI API", version="0.1.0")
 
 app.include_router(projects.router)
 app.include_router(agent_runs.router)
+app.include_router(knowledge.router)
 app.include_router(ws_router)
 
 

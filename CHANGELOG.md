@@ -5,6 +5,52 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Phase 2.8/2.9: Knowledge Agent (chunk/embed/index + semantic search)
+- `packages/memory` (new package, ADR-002's "~300-line custom layer, not
+  LlamaIndex/Haystack"): `chunking.py`'s `chunk_text()` (word-count
+  chunks with overlap, no tokenizer dependency) and `store.py`'s
+  `MemoryStore` (thin `qdrant-client` wrapper — `path=` for embedded
+  local mode, `url=`/`api_key=` for a real server; `upsert_document()`,
+  `search()`, `delete_source()`; new `MemoryStoreError` for qdrant-layer
+  failures, kept separate from `LLMError`, which still surfaces directly
+  from embedding failures).
+- `providers/llm/llm_provider/client.py`: new `embed()` +
+  `EmbeddingResponse`, routed through LiteLLM to Voyage AI
+  (`voyage/voyage-3-lite` default, `OREN_STUDIO_EMBEDDING_MODEL`
+  override) — Oren-approved choice, no prior doc specified an embedding
+  provider.
+- `agents/research_agent/agent.py`: result now includes `raw_text` (the
+  full digest/transcript, not just the LLM summary) for both GitHub and
+  YouTube paths — this is what Knowledge Agent indexes. Bumped to 0.4.0.
+- `agents/knowledge_agent/agent.py`: real logic replacing the Phase 1.18
+  stub — chunks + embeds + upserts `payload.text` into `knowledge_docs`,
+  emits `source.ingested`; skips cleanly (no event) when there's nothing
+  to index, same convention as Research Agent's unsupported-source-type
+  path.
+- `workflows/graph.py`: new `StudioState.research_raw_text` field;
+  `knowledge_node` now builds a real payload (`source_id`, `text`,
+  `project_id`, `source_type`, `source_url`) instead of the empty `{}`
+  every Stub Agent got by default — the same class of wiring gap fixed
+  for `research_node` back in Phase 2.3 (a Stub Agent ignoring its input
+  hides a bug that only surfaces once real logic depends on that input).
+  `source_id` is `run_id` for now — no live orchestrator-worker persists
+  `sources` rows yet; documented as a pragmatic stand-in in
+  `packages/memory/memory/store.py` and `docs/agents.md`.
+- `apps/api/app/routers/knowledge.py` + `app/services/knowledge.py`: new
+  `GET /api/knowledge/search?q=...&project_id=...&limit=...` (Phase 2.9).
+  Returns Qdrant's own payload directly, not yet the full "Qdrant +
+  Postgres hydrate" docs/api.md describes (no `sources` rows to hydrate
+  from yet); 503 on a down/unreachable store.
+- Tests: `packages/memory/tests/` (13, incl. real qdrant-client embedded
+  mode with mocked embeddings), `providers/llm/tests/test_client.py` (7,
+  first-ever tests for this provider's `complete()` too), `agents/
+  knowledge_agent/tests/` (7), `apps/api/tests/test_knowledge_search.py`
+  (5), plus new/updated `apps/api/tests/test_smoke_e2e.py` cases proving
+  the graph wiring end-to-end and updating the low-score-rejection test's
+  expected event list (`source.ingested` no longer fires unconditionally).
+- `Makefile`'s `test` target now also runs `agents/knowledge_agent/`,
+  `packages/memory/`, and `providers/llm/`.
+
 ### Added — Phase 2.10: Trend Agent v1 (GitHub Trending)
 - `agents/trend_agent/github_trending_source.py`: `fetch_trending_repos()`
   scrapes `github.com/trending` directly with BeautifulSoup — no official

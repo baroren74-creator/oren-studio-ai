@@ -119,6 +119,7 @@ async def test_github_happy_path_returns_parsed_summary_and_key_points():
     assert out.next_event == "research.completed"
     assert out.result["source_url"] == "https://github.com/octocat/Hello-World"
     assert out.result["repo_summary"] == FAKE_DIGEST.summary
+    assert out.result["raw_text"] == FAKE_DIGEST.as_prompt_text()
     assert "Hello World" in out.result["summary"]
     assert len(out.result["key_points"]) == 3
     assert out.result["key_points"][0] == "Single README file"
@@ -211,6 +212,7 @@ async def test_youtube_happy_path_returns_parsed_summary_and_key_points():
     assert out.result["video_id"] == "dQw4w9WgXcQ"
     assert out.result["transcript_language"] == "en"
     assert out.result["transcript_is_generated"] is True
+    assert out.result["raw_text"] == FAKE_TRANSCRIPT.as_prompt_text()
     assert "command-line tool" in out.result["summary"]
     assert len(out.result["key_points"]) == 3
 

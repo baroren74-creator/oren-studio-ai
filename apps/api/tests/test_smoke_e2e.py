@@ -264,7 +264,15 @@ def test_low_score_idea_is_rejected_before_final_review(client):
     different real path — status="failed", not "skipped" — covered by
     agents/research_agent/tests/test_youtube_source.py instead; both
     produce idea_score=0.0 the same way, so either is a valid "nothing to
-    score" case here.)"""
+    score" case here.)
+
+    Phase 2.8: the real Knowledge Agent also skips (no next_event) here —
+    Research Agent's "skipped" run leaves research_raw_text unset, so
+    knowledge_node's payload has no text to index (agents/knowledge_agent/
+    agent.py's own "nothing to index" skip path). Same lesson as Research
+    Agent going real: a Stub Agent ignoring its input can hide a graph
+    wiring gap that only shows up once real logic depends on that input —
+    "source.ingested" no longer fires unconditionally."""
 
     resp = client.post(
         "/api/projects",
@@ -289,10 +297,10 @@ def test_low_score_idea_is_rejected_before_final_review(client):
     assert not final_state.get("__interrupt__"), "must not reach final_review — rejected earlier, at scoring"
     assert final_state["rejected"] is True
     assert final_state["idea_score"] == 0.0
-    assert final_state["events"] == ["source.ingested", "idea.scored", "idea.rejected"]
-    # research_node must not leak a bare `None` into events when the real
-    # Research Agent returns status="skipped" (next_event=None) — see
-    # workflows/graph.py's _agent_event.
+    assert final_state["events"] == ["idea.scored", "idea.rejected"]
+    # Neither research_node nor knowledge_node may leak a bare `None`
+    # into events when their real Agent returns status="skipped"
+    # (next_event=None) — see workflows/graph.py's _agent_event.
     assert None not in final_state["events"]
 
     refreshed = client.get(f"/api/projects/{project['id']}").json()
@@ -348,3 +356,64 @@ def test_research_node_passes_source_fields_to_real_agent(client, monkeypatch):
         "source_type": "github",
         "source_url": "https://github.com/octocat/Hello-World",
     }
+
+
+def test_knowledge_node_passes_research_output_to_real_agent(client, monkeypatch):
+    """Phase 2.8 counterpart to the research_node regression test above:
+    knowledge_node must forward research_node's raw_text (threaded through
+    StudioState as research_raw_text) into the Knowledge Agent's payload,
+    keyed as source_id=run_id (see workflows/graph.py's knowledge_node
+    comment for why run_id stands in for a real sources.id row). Mocks
+    ResearchAgent.run (network-free) and patches
+    agents.knowledge_agent.agent._build_store so the real KnowledgeAgent
+    runs its actual logic without touching Qdrant/embeddings."""
+
+    resp = client.post(
+        "/api/projects",
+        json={"source_type": "github", "source_url": "https://github.com/octocat/Hello-World"},
+    )
+    project = resp.json()
+
+    async def _fake_research_run(self, input):
+        return AgentOutput(
+            status="success",
+            result={"summary": "A demo repo.", "key_points": ["one"], "raw_text": "full digest text here"},
+            next_event="research.completed",
+        )
+
+    monkeypatch.setattr("agents.research_agent.agent.ResearchAgent.run", _fake_research_run)
+
+    upsert_calls = []
+
+    class _FakeStore:
+        def upsert_document(self, **kwargs):
+            upsert_calls.append(kwargs)
+            return 2
+
+    monkeypatch.setattr("agents.knowledge_agent.agent._build_store", lambda: _FakeStore())
+
+    registry = _all_stub_registry(exclude=frozenset({"research_agent", "knowledge_agent"}))
+    registry.register("research_agent", lambda: agents.research_agent.agent.agent)
+    registry.register("knowledge_agent", lambda: agents.knowledge_agent.agent.agent)
+
+    graph = build_graph(registry=registry).compile(checkpointer=MemorySaver())
+    run_id = str(uuid.uuid4())
+    config = {"configurable": {"thread_id": run_id}}
+    final_state = graph.invoke(
+        {
+            "project_id": project["id"],
+            "run_id": run_id,
+            "source_type": project["source_type"],
+            "source_url": project["source_url"],
+            "events": [],
+        },
+        config=config,
+    )
+
+    assert len(upsert_calls) == 1
+    assert upsert_calls[0]["source_id"] == run_id
+    assert upsert_calls[0]["text"] == "full digest text here"
+    assert upsert_calls[0]["project_id"] == project["id"]
+    assert upsert_calls[0]["source_type"] == "github"
+    assert upsert_calls[0]["source_url"] == "https://github.com/octocat/Hello-World"
+    assert "source.ingested" in final_state["events"]
