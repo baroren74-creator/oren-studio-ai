@@ -48,3 +48,32 @@ def persist_research_note(
     db.commit()
     db.refresh(note)
     return note
+
+
+def update_idea_score(db: Session, *, research_note_id: str, score) -> ResearchNote | None:
+    """Fill in `interest_score`/`scored_by` on an existing research_notes
+    row (docs/database.md) — the Phase 2.6/2.7 UPDATE this module's
+    `persist_research_note` docstring said would come later.
+
+    `score` is a `workflows.idea_scoring.IdeaScore` (typed loosely here,
+    not imported, to avoid apps/api depending on workflows/ just for a
+    type hint — the same "Agents never import each other" spirit applied
+    one layer up: this module only needs `.total` and `.scored_by`).
+    `scored_by` is overwritten to the idea-scoring module's version
+    rather than kept as the Research Agent's — the score's provenance
+    matters more here than the summary's, and they're allowed to differ
+    (docs/database.md's `scored_by` is "agent version", singular, but
+    doesn't mandate which agent when more than one touches a row).
+
+    Returns None (writes nothing) if the row doesn't exist — the caller
+    is responsible for having a valid research_note_id; this function
+    doesn't create one implicitly."""
+    note = db.get(ResearchNote, research_note_id)
+    if note is None:
+        return None
+
+    note.interest_score = score.total
+    note.scored_by = score.scored_by
+    db.commit()
+    db.refresh(note)
+    return note

@@ -51,7 +51,10 @@ company-driven roadmap risk on a core dependency.
 
 ## ADR-003 — Idea scoring is a hard cost gate, not just a data field
 
-**Status:** Accepted (Phase 0)
+**Status:** Accepted (Phase 0); implemented Phase 2.6/2.7
+(`workflows/idea_scoring.py`, `workflows/graph.py`'s
+`idea_scoring_node`/`route_after_scoring` — see `docs/agents.md` 'Idea
+scoring rubric' for the written criteria this ADR required).
 
 **Context:** No cost/budget control existed in the original PRD; a
 Research→Script→Video pipeline run on every idea would be expensive.

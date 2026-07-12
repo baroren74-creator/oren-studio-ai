@@ -26,6 +26,24 @@ workflows/graph.py's research_node must forward project.source_type /
 source_url into the Agent's payload (previously it always sent `{}` —
 harmless for a Stub Agent that ignores its input, silently wrong for a
 real one that branches on it, see `_agent_event`'s docstring).
+
+Phase 2.6/2.7 update: idea_scoring_node is also real now
+(workflows/idea_scoring.py) and is NOT behind the Agent Registry (it's a
+plain graph node, like storyboard_node), so `_all_stub_registry()` alone
+can no longer make a run "fully stubbed" — idea_scoring_node will always
+call the real (LLM-backed) `score_idea()` unless a test also mocks
+`workflows.graph.score_idea` and seeds a `research_summary` in the
+initial state (idea_scoring_node short-circuits to a 0.0 rejection
+before ever calling score_idea if there's no summary to score — see
+`_mock_passing_score` below). `test_rejecting_final_review_does_not_publish`
+was rewritten for the same reason: a "youtube" project now gets
+correctly rejected at the *scoring* gate (no Research Agent support yet
+-> no summary -> score 0.0) before ever reaching final_review, which is
+new-and-correct behavior, not a bug — see
+`test_low_score_idea_is_rejected_before_final_review` for a test that
+protects it explicitly. `test_rejecting_final_review_does_not_publish`
+itself now uses a mocked passing score so it can actually reach
+final_review and test rejection *there*, which was always its point.
 """
 
 from __future__ import annotations
@@ -49,6 +67,15 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 
 from workflows.graph import build_graph
+from workflows.idea_scoring import IdeaScore
+
+
+def _mock_passing_score(monkeypatch, total: float = 100.0) -> None:
+    """Stub out the real (LLM-backed) idea scorer with a fixed passing
+    score, for tests whose focus is graph shape / later gates, not the
+    rubric itself (that's workflows/tests/test_idea_scoring.py's job)."""
+    fake_score = IdeaScore(total=total, breakdown={"novelty": 25, "audience_relevance": 25, "source_reliability": 25, "visual_potential": 25})
+    monkeypatch.setattr("workflows.graph.score_idea", lambda **kwargs: fake_score)
 
 # Mirrors the NEXT_EVENT each agents/*/agent.py stub is registered with
 # (Phase 1.18) — kept here, not imported, so this test independently
@@ -80,7 +107,7 @@ def _all_stub_registry(exclude: frozenset[str] = frozenset()) -> AgentRegistry:
     return registry
 
 
-def test_new_project_reaches_published_via_stub_pipeline(client):
+def test_new_project_reaches_published_via_stub_pipeline(client, monkeypatch):
     # 1. Create the project through the real HTTP API (proves apps/api +
     #    the DB layer work, not just the graph in isolation).
     resp = client.post(
@@ -95,7 +122,10 @@ def test_new_project_reaches_published_via_stub_pipeline(client):
     #    all-stub registry (see module docstring) — every node is a Stub
     #    Agent, but the graph *shape* is real: research -> knowledge ->
     #    idea scoring gate -> script -> storyboard -> recording -> video ->
-    #    voice -> mandatory approval gate -> publish.
+    #    voice -> mandatory approval gate -> publish. idea_scoring_node
+    #    isn't Agent-Registry-based (see module docstring), so it needs
+    #    its own mock + a seeded research_summary to clear the gate.
+    _mock_passing_score(monkeypatch)
     graph = build_graph(registry=_all_stub_registry()).compile(checkpointer=MemorySaver())
     run_id = str(uuid.uuid4())
     config = {"configurable": {"thread_id": run_id}}
@@ -106,6 +136,7 @@ def test_new_project_reaches_published_via_stub_pipeline(client):
             "run_id": run_id,
             "source_type": project["source_type"],
             "source_url": project["source_url"],
+            "research_summary": "Stub research summary for the pipeline-shape test.",
             "events": [],
         },
         config=config,
@@ -176,17 +207,59 @@ def test_new_project_reaches_published_via_stub_pipeline(client):
     assert runs[0]["agent_name"] == "orchestrator"
 
 
-def test_rejecting_final_review_does_not_publish(client):
+def test_rejecting_final_review_does_not_publish(client, monkeypatch):
     """The other half of the approval-gate contract: saying no must not
-    leave any path to a published state.
+    leave any path to a published state. Uses the all-stub registry plus
+    a mocked passing score (same reasoning as
+    test_new_project_reaches_published_via_stub_pipeline) so the run
+    actually reaches final_review — this test is specifically about
+    rejection *there*, not at the earlier scoring gate (see
+    test_low_score_idea_is_rejected_before_final_review for that)."""
 
-    Uses `build_graph()`'s default registry (not the all-stub one above)
-    deliberately: source_type="youtube" drives the *real* Research Agent
-    into its "skipped" path (agents/research_agent/agent.py — YouTube
-    isn't implemented yet, Phase 2.4+), which is itself a real code path
-    worth covering and touches no network. See
-    test_research_node_passes_source_fields_to_real_agent below for the
-    github/happy-path wiring check."""
+    resp = client.post(
+        "/api/projects",
+        json={"source_type": "github", "source_url": "https://github.com/x/y"},
+    )
+    project = resp.json()
+
+    _mock_passing_score(monkeypatch)
+    graph = build_graph(registry=_all_stub_registry()).compile(checkpointer=MemorySaver())
+    run_id = str(uuid.uuid4())
+    config = {"configurable": {"thread_id": run_id}}
+    graph.invoke(
+        {
+            "project_id": project["id"],
+            "run_id": run_id,
+            "source_type": project["source_type"],
+            "source_url": project["source_url"],
+            "research_summary": "Stub research summary for the rejection test.",
+            "events": [],
+        },
+        config=config,
+    )
+
+    final_state = graph.invoke(Command(resume=False), config=config)
+
+    assert final_state["approved"] is False
+    assert "publish.approved" not in final_state["events"]
+    assert None not in final_state["events"]
+
+    # project status in the DB must remain untouched — no code path here
+    # ever set it to "published".
+    refreshed = client.get(f"/api/projects/{project['id']}").json()
+    assert refreshed["status"] == "draft"
+
+
+def test_low_score_idea_is_rejected_before_final_review(client):
+    """New real behavior from Phase 2.6/2.7 (ADR-003's cost gate):
+    a project whose source type Research Agent doesn't support yet
+    (YouTube, Phase 2.4+) produces no research_summary, which
+    idea_scoring_node treats as an automatic 0.0 — below
+    IDEA_SCORE_THRESHOLD, so the pipeline stops at idea_rejected and
+    never reaches the expensive stages, let alone final_review. Uses
+    `build_graph()`'s default registry deliberately: this is exactly the
+    real Research Agent's real "skipped" path, no mocking needed, no
+    network touched."""
 
     resp = client.post(
         "/api/projects",
@@ -197,7 +270,7 @@ def test_rejecting_final_review_does_not_publish(client):
     graph = build_graph().compile(checkpointer=MemorySaver())
     run_id = str(uuid.uuid4())
     config = {"configurable": {"thread_id": run_id}}
-    graph.invoke(
+    final_state = graph.invoke(
         {
             "project_id": project["id"],
             "run_id": run_id,
@@ -208,17 +281,15 @@ def test_rejecting_final_review_does_not_publish(client):
         config=config,
     )
 
-    final_state = graph.invoke(Command(resume=False), config=config)
-
-    assert final_state["approved"] is False
-    assert "publish.approved" not in final_state["events"]
+    assert not final_state.get("__interrupt__"), "must not reach final_review — rejected earlier, at scoring"
+    assert final_state["rejected"] is True
+    assert final_state["idea_score"] == 0.0
+    assert final_state["events"] == ["source.ingested", "idea.scored", "idea.rejected"]
     # research_node must not leak a bare `None` into events when the real
     # Research Agent returns status="skipped" (next_event=None) — see
     # workflows/graph.py's _agent_event.
     assert None not in final_state["events"]
 
-    # project status in the DB must remain untouched — no code path here
-    # ever set it to "published".
     refreshed = client.get(f"/api/projects/{project['id']}").json()
     assert refreshed["status"] == "draft"
 

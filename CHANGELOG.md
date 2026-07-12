@@ -5,6 +5,40 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Phase 2.6/2.7: real Idea Scoring rubric + cost gate
+- `workflows/idea_scoring.py`: `score_idea()` — a written 4-criterion
+  rubric (novelty, audience_relevance, source_reliability,
+  visual_potential, each 0-25), LLM judges each criterion independently,
+  total is summed in code rather than asked of the LLM directly (ADR-003:
+  not a bare freeform prompt). Rubric text documented in `docs/agents.md`
+  'Idea scoring rubric'.
+- `workflows/graph.py`: `idea_scoring_node` replaced from a hardcoded
+  `idea_score=100.0` stub with the real rubric; a project with no
+  Research Agent output to score (unsupported source type, fetch/LLM
+  failure) is scored 0.0 automatically. `StudioState` gained
+  `research_summary`/`research_key_points`/`idea_score_breakdown`;
+  `research_node` now forwards the Agent's summary/key_points forward
+  through graph state (without clobbering a caller-seeded value when the
+  registered Agent is a Stub that doesn't produce one — see
+  `research_node`'s comment).
+- `apps/api/app/services/research.py`: `update_idea_score()` — fills in
+  the existing `research_notes` row's `interest_score`/`scored_by`
+  (Phase 2.3's `persist_research_note()` had left these NULL on purpose,
+  as noted at the time).
+- Tests: `workflows/tests/test_idea_scoring.py` (rubric parsing, clamping,
+  error paths — mocked LLM, no network), `apps/api/tests/
+  test_research_persistence.py` (score persistence),
+  `apps/api/tests/test_smoke_e2e.py` updated: the all-stub pipeline-shape
+  test now also mocks `score_idea` (idea_scoring_node isn't Agent-
+  Registry-based, so `_all_stub_registry()` alone doesn't cover it) and
+  seeds a `research_summary`; `test_rejecting_final_review_does_not_publish`
+  now uses a passing mock score so it actually reaches final_review
+  (previously it used a YouTube project, which — now correctly — gets
+  rejected at the *scoring* gate before ever reaching final_review); new
+  `test_low_score_idea_is_rejected_before_final_review` covers that real
+  behavior explicitly.
+- `Makefile`'s `test` target now also runs `workflows/tests/`.
+
 ### Added — Phase 2.1/2.4: LLM provider + Research Agent v1 (real logic)
 - `providers/llm/llm_provider/client.py`: LiteLLM-based provider
   abstraction (`complete()`, `LLMMessage`, `LLMResponse`, `LLMError`),

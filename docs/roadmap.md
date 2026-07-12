@@ -130,9 +130,22 @@ in case scheduled/automated posting is wanted later.
     summary.
 2.6 Idea Scoring rubric written down explicitly (novelty, audience
     relevance, source reliability, visual potential) — not just a
-    freeform prompt.
+    freeform prompt — **done**
+    (`workflows/idea_scoring.py`, rubric text in `docs/agents.md` 'Idea
+    scoring rubric'; 4 criteria scored 0-25 each by the LLM, summed in
+    code rather than asked of the LLM as one number).
 2.7 `interest_score` Gate: below threshold → `idea.rejected`, pipeline
-    stops (cost control, see `docs/decisions.md` ADR-003).
+    stops (cost control, see `docs/decisions.md` ADR-003) — **done**
+    (`workflows/graph.py`'s `idea_scoring_node`/`route_after_scoring`,
+    unchanged threshold logic — only what feeds it is now real. A
+    project with no Research Agent output to score is scored 0.0
+    automatically, same as an explicit rubric failure. Score persisted
+    onto the existing `research_notes` row via
+    `apps/api/app/services/research.py`'s `update_idea_score()`.
+    Tests: `workflows/tests/test_idea_scoring.py` (rubric parsing/
+    errors, mocked LLM), `apps/api/tests/test_smoke_e2e.py` (gate
+    routing), `apps/api/tests/test_research_persistence.py` (score
+    persistence)).
 2.8 Knowledge Agent: chunking + embedding — **custom thin layer**, not
     LlamaIndex/Haystack (see ADR-002) — writes to Qdrant `knowledge_docs`.
 2.9 Knowledge Agent: semantic search endpoint.

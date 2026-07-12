@@ -60,9 +60,39 @@ Each Agent's exact `payload`/`result` schema is defined in its own
 territory. When an Agent's schema changes, update this table's
 "Responsibility" column if the change is behavior-visible.
 
-## Idea scoring rubric (owned by Research/Knowledge Agents, Phase 2.6)
+## Idea scoring rubric (Phase 2.6/2.7 — implemented)
 
-To be filled in when Phase 2.6 is implemented — criteria: novelty,
-relevance to Oren's stated interests, source reliability, visual
-potential. Do not leave this as a bare LLM prompt without a written
-rubric here (see ADR-003).
+Implementation: `workflows/idea_scoring.py`'s `score_idea()`. Not a
+registered Agent (no entry in the roster above) — like the future
+Storyboard step (Phase 3.7), it's a custom LLM-prompting module wired
+directly into `workflows/graph.py`'s `idea_scoring_node`, run right after
+Research + Knowledge and before any expensive stage (ADR-003).
+
+Four criteria, each scored 0-25 by the LLM, summed in code (not asked of
+the LLM as a single number — see `score_idea`'s docstring for why that
+distinction matters):
+
+| Criterion | What it judges |
+|---|---|
+| `novelty` | Fresh/uncommon, or already covered extensively elsewhere? |
+| `audience_relevance` | Fits a tech-focused short-video channel (dev tools, AI, open source, practical demos)? |
+| `source_reliability` | Does the source look mature and credible (real docs, apparent real-world usage), not a toy/abandoned project? |
+| `visual_potential` | Lends itself to a short, visual, demo-able video, rather than being purely abstract/textual? |
+
+Total (0-100) is compared against `workflows/graph.py`'s
+`IDEA_SCORE_THRESHOLD` (50.0); below it, the graph routes to
+`idea_rejected` and stops before Script/Storyboard/Recording/Video/Voice
+ever run. A project with no Research Agent output to score (unsupported
+source type, fetch/LLM failure) is scored 0.0 automatically — there's
+nothing to judge, so it can't clear the gate (`idea_scoring_node`'s
+docstring).
+
+`audience_relevance` is currently judged only against "is this a
+tech-content channel fit" in general, not Oren's specific stated
+interests — there's no `style_profile` yet (Phase 3.1) to ground that in.
+Revisit this criterion's prompt once `style_profile` exists.
+
+The score is persisted onto the `research_notes` row the Research Agent
+already wrote (`interest_score`/`scored_by` columns,
+`apps/api/app/services/research.py`'s `update_idea_score()`) — not a new
+row, per that module's original note that this UPDATE would come later.

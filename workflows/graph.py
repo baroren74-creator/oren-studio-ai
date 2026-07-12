@@ -7,12 +7,14 @@ services/orchestrator-worker as a Python library — this deliberately
 does NOT use the hosted LangGraph Platform server (see
 docs/decisions.md ADR-001).
 
-Phase 1 (docs/roadmap.md 1.13): every node below calls a Stub Agent via
-the Agent Registry, so the graph shape — including the idea-rejection
-short-circuit (ADR-003) and the mandatory human approval gate before
-publish (ADR-011) — can be validated end-to-end before any node has real
-logic. Swap in real Agent implementations later without changing this
-file's structure.
+Phase 1 (docs/roadmap.md 1.13) built this with every node calling a Stub
+Agent via the Agent Registry, so the graph shape — including the
+idea-rejection short-circuit (ADR-003) and the mandatory human approval
+gate before publish (ADR-011) — could be validated end-to-end before any
+node had real logic. Phase 2.3/2.4/2.6/2.7 replaced research_node and
+idea_scoring_node with real logic without changing this file's
+structure — that was the point. Remaining nodes (knowledge, script,
+recording, video, voice, publishing) are still Stub Agents.
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ from langgraph.types import interrupt
 
 from core.registry import AgentRegistry, default_registry
 from core.schemas.agent import AgentContext, AgentInput
+from workflows.idea_scoring import IdeaScoringError, score_idea
 
 
 class StudioState(TypedDict, total=False):
@@ -37,8 +40,11 @@ class StudioState(TypedDict, total=False):
     run_id: str
     source_type: str | None
     source_url: str | None
+    research_summary: str | None
+    research_key_points: list[str] | None
     events: Annotated[list[str], add]
     idea_score: float
+    idea_score_breakdown: dict[str, int] | None
     rejected: bool
     approved: bool
 
@@ -102,15 +108,46 @@ def build_graph(registry: AgentRegistry | None = None):
         # Agent that ignores payload, so still gets {} via _agent_event's
         # default.
         payload = {"source_type": state.get("source_type"), "source_url": state.get("source_url")}
-        return _agent_event(reg, "research_agent", state, payload=payload)
+        out = _run_agent_sync(reg, "research_agent", state, payload=payload)
+        update: dict[str, Any] = {"events": [out["next_event"]] if out["next_event"] else []}
+        # Only set research_summary/key_points when the Agent's result
+        # actually has them (a real, successful ResearchAgent run) —
+        # deliberately does NOT overwrite with None on every run, so a
+        # Stub Agent registered under "research_agent" (whose result has
+        # no "summary" key, see core.stub_agent.StubAgent) can't clobber
+        # a value a caller pre-seeded in the initial graph state, e.g.
+        # for graph-shape tests that stub every Agent but still want
+        # idea_scoring_node to see a summary (apps/api/tests/
+        # test_smoke_e2e.py).
+        result = out.get("result") or {}
+        if "summary" in result:
+            update["research_summary"] = result.get("summary")
+            update["research_key_points"] = result.get("key_points")
+        return update
 
     def knowledge_node(state: StudioState) -> dict:
         return _agent_event(reg, "knowledge_agent", state)
 
     def idea_scoring_node(state: StudioState) -> dict:
-        # Phase 1 stub: always scores above threshold. Phase 2.6 replaces
-        # this with the real rubric (docs/agents.md 'Idea scoring rubric').
-        return {"idea_score": 100.0, "events": ["idea.scored"]}
+        # Phase 2.6/2.7 (docs/agents.md 'Idea scoring rubric', ADR-003):
+        # a real rubric-based score gates progression — no Research Agent
+        # output to score means nothing to base a decision on, so this
+        # can't clear the gate (score 0.0, same as an explicit rubric
+        # failure below). route_after_scoring/idea_rejected_node handle
+        # the actual "stop here" branching — this node's only job is to
+        # produce a score, not to decide what to do with it.
+        summary = state.get("research_summary")
+        if not summary:
+            return {"idea_score": 0.0, "events": ["idea.scored"]}
+        try:
+            score = score_idea(summary=summary, key_points=state.get("research_key_points"))
+        except IdeaScoringError:
+            return {"idea_score": 0.0, "events": ["idea.scored"]}
+        return {
+            "idea_score": score.total,
+            "idea_score_breakdown": score.breakdown,
+            "events": ["idea.scored"],
+        }
 
     def route_after_scoring(state: StudioState) -> str:
         if state.get("idea_score", 0) < IDEA_SCORE_THRESHOLD:

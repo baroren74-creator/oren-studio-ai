@@ -6,7 +6,11 @@ requires-python = ">=3.11"
 dependencies = [
     "langgraph>=0.2",
     "oren-studio-core",
+    "oren-studio-providers-llm",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
 
 [build-system]
 requires = ["setuptools>=68"]
