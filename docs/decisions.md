@@ -298,3 +298,37 @@ have been a genuinely confusing silent bug (duplicate events in
 production, or a broken `UNIQUE` constraint) if discovered later instead
 of now, in a stub-only test. Worth remembering for every future node that
 does I/O near an interrupt, not just this one.
+
+---
+
+## ADR-013 — YouTube transcripts via youtube-transcript-api, not faster-whisper
+
+**Status:** Accepted (Phase 2.5, Oren-approved deviation from the
+original roadmap wording)
+
+**Context:** `docs/roadmap.md` originally specced Research Agent v2 as
+"YouTube URL → transcript (faster-whisper) → summary" — download the
+video's audio, run a local Whisper model to transcribe it. Two problems
+surfaced while implementing this: (1) YouTube already serves a
+transcript — human-written or auto-generated captions — for the large
+majority of videos worth summarizing, retrievable directly from
+YouTube's own timedtext API, with no audio processing at all; (2) this
+sandbox's network allowlist (`github.com`, `registry.npmjs.org`,
+`pypi.org`, `files.pythonhosted.org`) doesn't include `youtube.com` or
+any CDN/model-hosting domain faster-whisper would need, so a
+faster-whisper approach couldn't even be verified from here, let alone
+run without a GPU for reasonable speed.
+
+**Decision:** `agents/research_agent/youtube_source.py` fetches an
+existing transcript via `youtube-transcript-api` (MIT) instead. Flagged
+to Oren directly rather than silently implemented differently from the
+roadmap's wording — approved.
+
+**Consequences:** Videos with no transcript available at all (rare, but
+exists — e.g. a channel that disabled captions entirely) aren't
+supported by this v1; `fetch_video_transcript` raises
+`YouTubeSourceError` and the Agent returns `status="failed"` cleanly for
+that case, same as any other fetch failure (no silent wrong answer).
+faster-whisper remains the documented fallback for that specific gap if
+it turns out to matter in practice — not implemented now, since it would
+be solving a problem that hasn't actually shown up yet.

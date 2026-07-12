@@ -126,8 +126,22 @@ in case scheduled/automated posting is wanted later.
     plus one `@pytest.mark.integration` live-network check),
     `apps/api/tests/test_smoke_e2e.py` (graph wiring),
     `apps/api/tests/test_research_persistence.py` (DB persistence).
-2.5 Research Agent v2: YouTube URL → transcript (faster-whisper) →
-    summary.
+2.5 Research Agent v2: YouTube URL → transcript → summary — **done**,
+    revised approach (`docs/decisions.md` ADR-013): fetches YouTube's
+    own captions via `youtube-transcript-api`
+    (`agents/research_agent/youtube_source.py`) instead of the
+    originally-specced faster-whisper (audio download + local STT model)
+    — no audio processing, no local model, no GPU, works for the
+    overwhelming majority of videos. `agents/research_agent/agent.py`'s
+    `run()` now branches on `source_type` (`SUPPORTED_SOURCE_TYPES =
+    ("github", "youtube")`); summarization logic shared via `_summarize()`
+    rather than duplicated per source type. Tests:
+    `agents/research_agent/tests/test_youtube_source.py` (URL parsing,
+    transcript fetch, mocked), `test_agent.py`'s youtube-path tests. No
+    live-network integration test exists for this one — this sandbox's
+    network allowlist doesn't include youtube.com at all (unlike
+    github.com for the Gitingest case), see `youtube_source.py`'s
+    docstring.
 2.6 Idea Scoring rubric written down explicitly (novelty, audience
     relevance, source reliability, visual potential) — not just a
     freeform prompt — **done**

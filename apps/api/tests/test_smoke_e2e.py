@@ -252,18 +252,23 @@ def test_rejecting_final_review_does_not_publish(client, monkeypatch):
 
 def test_low_score_idea_is_rejected_before_final_review(client):
     """New real behavior from Phase 2.6/2.7 (ADR-003's cost gate):
-    a project whose source type Research Agent doesn't support yet
-    (YouTube, Phase 2.4+) produces no research_summary, which
-    idea_scoring_node treats as an automatic 0.0 — below
+    a project whose source type Research Agent doesn't support at all
+    (articles/tweets — Research Agent currently handles github/youtube
+    only, see SUPPORTED_SOURCE_TYPES) produces no research_summary,
+    which idea_scoring_node treats as an automatic 0.0 — below
     IDEA_SCORE_THRESHOLD, so the pipeline stops at idea_rejected and
     never reaches the expensive stages, let alone final_review. Uses
     `build_graph()`'s default registry deliberately: this is exactly the
     real Research Agent's real "skipped" path, no mocking needed, no
-    network touched."""
+    network touched. (A malformed/unfetchable YouTube URL hits a
+    different real path — status="failed", not "skipped" — covered by
+    agents/research_agent/tests/test_youtube_source.py instead; both
+    produce idea_score=0.0 the same way, so either is a valid "nothing to
+    score" case here.)"""
 
     resp = client.post(
         "/api/projects",
-        json={"source_type": "youtube", "source_url": "https://youtube.com/watch?v=abc"},
+        json={"source_type": "article", "source_url": "https://example.com/some-post"},
     )
     project = resp.json()
 

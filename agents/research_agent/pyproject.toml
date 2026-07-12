@@ -1,11 +1,12 @@
 [project]
 name = "oren-studio-research-agent"
-version = "0.2.0"
-description = "Research Agent — GitHub repo digest (Gitingest) + summary (LLM provider). See docs/agents.md and docs/roadmap.md Phase 2.3."
+version = "0.3.0"
+description = "Research Agent — GitHub repo digest (Gitingest) / YouTube transcript (youtube-transcript-api) + summary (LLM provider). See docs/agents.md and docs/roadmap.md Phase 2.3/2.5."
 requires-python = ">=3.11"
 dependencies = [
     "gitingest>=0.3",
     "httpx[socks]>=0.27",
+    "youtube-transcript-api>=1.0",
     "oren-studio-core",
     "oren-studio-providers-llm",
 ]

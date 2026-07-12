@@ -5,6 +5,31 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Phase 2.5: Research Agent v2 (YouTube support)
+- `agents/research_agent/youtube_source.py`: `fetch_video_transcript()` —
+  fetches YouTube's own captions via `youtube-transcript-api`, not the
+  originally-specced faster-whisper (docs/decisions.md ADR-013: no audio
+  download, no local STT model, no GPU; also the only option that works
+  from this sandbox at all, since its network allowlist doesn't include
+  youtube.com or any model-hosting domain).
+- `agents/research_agent/agent.py`: `run()` now branches on
+  `source_type` (`SUPPORTED_SOURCE_TYPES = ("github", "youtube")`);
+  summarization logic extracted into a shared `_summarize()` helper
+  rather than duplicated per source type. GitHub's LLM-failure result key
+  renamed `digest_summary` → `repo_summary` for consistency with the
+  success-path key of the same name (docs/roadmap.md 2.5's note); the
+  failure path also now includes `source_url`, which it previously
+  didn't.
+- Tests: `agents/research_agent/tests/test_youtube_source.py` (URL
+  parsing across common link shapes, transcript fetch, error wrapping —
+  mocked, no network), `test_agent.py` extended with youtube-path tests
+  mirroring the existing github-path ones; the old
+  `test_non_github_source_type_is_skipped_not_crashed` (which used
+  `source_type="youtube"` to represent "unsupported") renamed/repointed
+  to `article` now that youtube is supported.
+  `apps/api/tests/test_smoke_e2e.py`'s scoring-gate test updated the
+  same way.
+
 ### Added — Phase 2.6/2.7: real Idea Scoring rubric + cost gate
 - `workflows/idea_scoring.py`: `score_idea()` — a written 4-criterion
   rubric (novelty, audience_relevance, source_reliability,
