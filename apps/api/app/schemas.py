@@ -61,3 +61,28 @@ class KnowledgeSearchResultOut(BaseModel):
     text: str
     score: float
     payload: dict
+
+
+class StyleProfileCreate(BaseModel):
+    """Phase 3.1's manual one-time questionnaire, submitted as one
+    request — see docs/agents.md's Script Agent section / scripts/
+    seed_style_profile.py for Oren's actual v0 answers."""
+
+    tone_notes: str | None = None
+    opening_patterns: list[str] = []
+    closing_patterns: list[str] = []
+    avg_length_seconds: float | None = None
+    vocabulary_notes: dict | None = None
+
+
+class StyleProfileOut(BaseModel):
+    id: str
+    version: int
+    tone_notes: str | None
+    opening_patterns: list[str] | None
+    closing_patterns: list[str] | None
+    avg_length_seconds: float | None
+    vocabulary_notes: dict | None
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

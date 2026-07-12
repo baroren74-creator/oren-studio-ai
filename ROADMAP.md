@@ -11,7 +11,7 @@ progress at a glance.
 | 0.5 | Publishing API applications (Instagram/Facebook/TikTok) | ⏸ Deferred — not needed for v1, see ADR-011 |
 | 1 | Project Initialization (this repo skeleton) | ✅ Done — repo, infra config, and a tested code skeleton (API + web + orchestrator graph + 8 stub agents) all pushed to GitHub |
 | 2 | Research + Knowledge + Trend Agents | 🟡 In progress — Research Agent v1/v2 (GitHub + YouTube), real Idea Scoring gate, Knowledge Agent (chunk/embed/index + semantic search), Trend Agent v1 (GitHub Trending) done, see `docs/roadmap.md` 2.4/2.5/2.6/2.7/2.8/2.9/2.10 |
-| 3 | Script + Storyboard | ⬜ Not started |
+| 3 | Script + Storyboard | 🟡 In progress — style_profile v0 questionnaire done (3.1), see `docs/roadmap.md` |
 | 3.5 | Hebrew RTL caption rendering spike | ⬜ Not started |
 | 4 | Production (Recording / Avatar / Video / Voice) | ⬜ Not started |
 | 5 | Publishing + Approval (manual upload, see ADR-011) | ⬜ Not started |

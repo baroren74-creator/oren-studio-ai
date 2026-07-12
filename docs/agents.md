@@ -49,7 +49,7 @@ Orchestrator code.
 | Research Agent | `agents/research_agent` | Finds sources, reads documentation, summarizes, understands the underlying technology, finds the *original* source. | `research.completed` |
 | Trend Agent | `agents/trend_agent` | Discovers new things: GitHub Trending (v1, done), Hacker News, Product Hunt, Reddit, AI news, Twitter/X (deferred), YouTube, blogs. Not a `workflows/graph.py` node — runs independent of any project (`ideas.project_id` is nullable), triggered separately, not per-project. | `trend.discovered`, feeds the Idea Backlog |
 | Knowledge Agent | `agents/knowledge_agent` | Chunks + embeds + indexes the Research Agent's raw digest/transcript text into Qdrant's `knowledge_docs` collection via `packages/memory` (Phase 2.8, done — see the section below). Semantic search (`GET /api/knowledge/search`) is a separate `apps/api` route, not this Agent (Phase 2.9, done). | `source.ingested` |
-| Script Agent | `agents/script_agent` | Writes Hook, Body, CTA, Caption, Title, Hashtags — in Oren's style (`style_profile`). | `script.drafted` |
+| Script Agent | `agents/script_agent` | Writes Hook, Body, CTA, Caption, Title, Hashtags — in Oren's style (`style_profile`, v0 questionnaire done — see the section below; the Agent itself is still the Phase 1.18 stub, Phase 3.2-3.4). | `script.drafted` |
 | Recording Agent | `agents/recording_agent` | v0: manual upload. Later: drives an Avatar provider (MuseTalk/LivePortrait). | `recording.completed` |
 | Video Agent | `agents/video_agent` | Cuts, zooms, captions, B-roll/screenshot overlay, cursor highlight, thumbnail. | `video.rendered`, `captions.generated`, `thumbnail.generated` |
 | Voice Agent | `agents/voice_agent` | Voice enhancement, dubbing, translation, cloning (commercial API by default — ADR-004). | `voice.completed` |
@@ -145,3 +145,30 @@ needs a real `sources` row to hydrate *from*, which doesn't exist yet
 (same gap as above). Returns 503 (not 500/4xx) when the store is
 unreachable — a dependency failure, not something the client can fix by
 retrying differently.
+
+## Style profile (Phase 3.1 — implemented)
+
+`docs/database.md`'s `style_profile` table (`apps/api/app/models.py`'s
+`StyleProfile`), filled in via a manual one-time questionnaire — asked
+in chat, not a UI (Prompt Library UI, Phase 3.5, doesn't exist yet).
+Versioned rather than updated in place (`app/services/style_profile.py`):
+`POST /api/style-profile` always inserts at `max(version) + 1`;
+`GET /api/style-profile/current` reads the highest version (404 if the
+questionnaire has never been run). `opening_patterns`/`closing_patterns`
+are stored as JSON lists in code even though docs/database.md shows
+`TEXT[]` — the same SQLite/Postgres-agnostic simplification
+`ResearchNote.key_points` already uses.
+
+Oren's actual v0 answers (2026-07-12): tone is a mix of energetic/fast,
+professional/precise, and friendly/conversational — deliberately not one
+single register; videos run 30-45 seconds; opening patterns `"הי חברים
+תראו מה מצאתי"` / `"ידעתם שיש כזה דבר?"`; closing patterns `"אהבתם, רוצים
+עוד? תעקבו"` / `"ללינק כתבו לי בתגובות"`. Seeded via
+`scripts/seed_style_profile.py` (idempotent-ish: safe to re-run, just
+creates another version rather than corrupting anything) — not yet run
+against a real Postgres instance since none is live from this sandbox;
+verified end-to-end against a throwaway SQLite DB, including the Hebrew
+text round-tripping correctly through JSON storage.
+
+The Script Agent itself (Phase 3.2-3.4) is still the Phase 1.18 stub —
+this section covers only the data it will read once built.

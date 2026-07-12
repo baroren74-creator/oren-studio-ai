@@ -38,11 +38,11 @@ test: ## Run Python test suites (apps/api, agents/research_agent, agents/trend_a
 	cd packages/memory && PYTHONPATH="$(CURDIR)/providers/llm" python3 -m pytest tests/ -v
 	cd providers/llm && python3 -m pytest tests/ -v
 
-migrate: ## Run DB migrations (placeholder — wired up once apps/api exists)
-	@echo "Migrations not wired up yet — see docs/database.md"
+migrate: ## Run DB migrations against DATABASE_URL (apps/api/alembic)
+	cd apps/api && python3 -m alembic upgrade head
 
-seed: ## Seed local DB with dev data (placeholder)
-	@echo "Seeding not wired up yet"
+seed: ## Seed local DB with dev data (currently: style_profile v0, Phase 3.1)
+	PYTHONPATH="$(CURDIR):$(CURDIR)/packages/core:$(CURDIR)/workflows:$(CURDIR)/providers/llm:$(CURDIR)/packages/memory:$(CURDIR)/apps/api" python3 scripts/seed_style_profile.py
 
 pre-commit: ## Run pre-commit hooks against all files
 	pre-commit run --all-files

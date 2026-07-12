@@ -5,6 +5,30 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Phase 3.1: style_profile v0 (manual questionnaire)
+- `apps/api/app/models.py`: new `StyleProfile` (table `style_profile`,
+  matching docs/database.md). `opening_patterns`/`closing_patterns`
+  stored as JSON lists rather than Postgres `TEXT[]` — same engine-
+  agnostic simplification `ResearchNote.key_points` already uses.
+  Migration: `alembic/versions/c3a9f1d8e2b4_add_style_profile_table.py`.
+- `apps/api/app/services/style_profile.py`: `create_style_profile()`
+  (always inserts at `max(version) + 1` — versioned, not updated in
+  place) and `get_current_style_profile()` (highest version).
+- `apps/api/app/routers/style_profile.py`: `POST /api/style-profile`
+  (create) and `GET /api/style-profile/current` (404 if none exists) —
+  the GET was already in docs/api.md's route list; POST is a symmetric
+  addition documented alongside it.
+- `scripts/seed_style_profile.py`: seeds the actual v0 row from Oren's
+  answers, collected in chat (tone: energetic/fast + professional/
+  precise + friendly/conversational, not one register; 30-45s videos;
+  two opening patterns, two closing patterns, both in Hebrew). Not yet
+  run against a real Postgres instance (none live from this sandbox) —
+  verified end-to-end against a throwaway SQLite DB instead, including
+  correct Hebrew round-tripping through JSON storage.
+- Tests: `apps/api/tests/test_style_profile.py` (9 cases — versioning,
+  current-lookup, both routes, 404, auth). Full suite: 24/24 passing in
+  `apps/api`.
+
 ### Added — Phase 2.8/2.9: Knowledge Agent (chunk/embed/index + semantic search)
 - `packages/memory` (new package, ADR-002's "~300-line custom layer, not
   LlamaIndex/Haystack"): `chunking.py`'s `chunk_text()` (word-count

@@ -22,7 +22,8 @@ GET    /api/knowledge/search?q=...       semantic search — done (Phase 2.9), c
                                           own payload, not yet Postgres-hydrated (no sources rows persisted
                                           yet — see docs/agents.md's Knowledge Agent section)
 POST   /api/prompt-library
-GET    /api/style-profile/current
+POST   /api/style-profile                create a new version (Phase 3.1's questionnaire) — done
+GET    /api/style-profile/current        highest version, 404 if none created yet — done
 ```
 
 Auth: `STUDIO_API_KEY` header (see ADR-006). No OAuth/session layer in

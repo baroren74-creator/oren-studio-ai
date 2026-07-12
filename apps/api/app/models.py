@@ -2,13 +2,13 @@
 
 Phase 1 scope (docs/roadmap.md 1.8) was exactly: projects, sources,
 agent_runs, agent_events, approvals. `research_notes` was added in Phase
-2.3 alongside the real Research Agent (agents/research_agent/agent.py) —
+2.3 alongside the real Research Agent (agents/research_agent/agent.py),
+`style_profile` in Phase 3.1 alongside the style questionnaire — each
 the first table added incrementally as the feature that needs it landed,
 per the Phase 1 note below. The rest of docs/database.md's schema
 (ideas, scripts, storyboards, assets, videos, publications, memory_entries,
-style_profile, prompt_library, favorite_tools, brand_assets) is still
-added incrementally in later phases as those features are built — not all
-at once here.
+prompt_library, favorite_tools, brand_assets) is still added incrementally
+in later phases as those features are built — not all at once here.
 """
 
 from __future__ import annotations
@@ -126,3 +126,30 @@ class ResearchNote(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     project: Mapped["Project"] = relationship(back_populates="research_notes")
+
+
+class StyleProfile(Base):
+    """Oren's writing-voice profile (docs/database.md) — Phase 3.1's
+    "manual one-time questionnaire" (tone, length, favorite openers/
+    closers), which the Script Agent (Phase 3.2-3.4) reads to write in
+    his style rather than a generic one. Versioned, not updated in place
+    — a new questionnaire pass creates a new row (higher `version`); the
+    Script Agent always reads the highest version
+    (`GET /api/style-profile/current`).
+
+    `opening_patterns`/`closing_patterns` are `TEXT[]` in docs/database.md
+    but stored here as JSON lists — same engine-agnostic simplification
+    ResearchNote.key_points already uses (JSON works identically on
+    SQLite in tests and Postgres in production; native Postgres ARRAY
+    doesn't exist on SQLite)."""
+
+    __tablename__ = "style_profile"  # matches docs/database.md's exact (singular) table name
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    version: Mapped[int] = mapped_column()
+    tone_notes: Mapped[str | None] = mapped_column(Text)
+    opening_patterns: Mapped[list | None] = mapped_column(JSON)
+    closing_patterns: Mapped[list | None] = mapped_column(JSON)
+    avg_length_seconds: Mapped[float | None] = mapped_column(Numeric)
+    vocabulary_notes: Mapped[dict | None] = mapped_column(JSON)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)

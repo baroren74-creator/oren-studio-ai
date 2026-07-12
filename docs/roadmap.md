@@ -241,7 +241,32 @@ in case scheduled/automated posting is wanted later.
 ## Phase 3 — Script + Storyboard
 
 3.1 `style_profile` v0 — manual one-time questionnaire (tone, length,
-    favorite openers/closers).
+    favorite openers/closers). **Done.** `apps/api/app/models.py`'s
+    `StyleProfile` (table `style_profile`, matching docs/database.md;
+    `opening_patterns`/`closing_patterns` stored as JSON lists rather
+    than Postgres `TEXT[]` — same engine-agnostic simplification
+    `ResearchNote.key_points` already uses). Versioned, not updated in
+    place — `app/services/style_profile.py`'s `create_style_profile()`
+    always inserts at `max(version) + 1`; `get_current_style_profile()`
+    reads the highest version. Routes: `POST /api/style-profile`
+    (create), `GET /api/style-profile/current` (404 if none exists yet)
+    — the GET was already in docs/api.md's route list; POST is a
+    symmetric addition documented alongside it.
+
+    Oren's actual v0 answers (collected via chat, 2026-07-12): tone is a
+    mix of energetic/fast, professional/precise, and friendly/
+    conversational — not one single register; length 30-45 seconds;
+    opening patterns `"הי חברים תראו מה מצאתי"` / `"ידעתם שיש כזה דבר?"`;
+    closing patterns `"אהבתם, רוצים עוד? תעקבו"` / `"ללינק כתבו לי
+    בתגובות"`. Seeded via `scripts/seed_style_profile.py` — run once
+    against a migrated database (not yet run against a real Postgres
+    instance, since none is live from this sandbox; verified end-to-end
+    against a throwaway SQLite DB instead, Hebrew text round-tripping
+    correctly through JSON storage).
+
+    Migration: `apps/api/alembic/versions/c3a9f1d8e2b4_add_style_profile_
+    table.py`. Tests: `apps/api/tests/test_style_profile.py` (9 cases —
+    versioning, current-lookup, both routes, 404, auth).
 3.2–3.4 Script Agent: Hook, Body+CTA, Caption/Title/Hashtags.
 3.5 Prompt Library UI (CRUD + versioning).
 3.6 Approval Gate #1: review/edit script before continuing.

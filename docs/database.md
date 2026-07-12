@@ -144,12 +144,12 @@ memory_entries (
   created_at, updated_at
 )
 
-style_profile (
+style_profile (              -- implemented Phase 3.1, apps/api/app/models.py's StyleProfile
   id UUID PK,
   version INT,
   tone_notes TEXT,
-  opening_patterns TEXT[],
-  closing_patterns TEXT[],
+  opening_patterns TEXT[],   -- stored as JSON in code (SQLite/Postgres-agnostic), not a native array
+  closing_patterns TEXT[],   -- same
   avg_length_seconds NUMERIC,
   vocabulary_notes JSONB,
   updated_at
