@@ -19,10 +19,10 @@ from unittest.mock import AsyncMock
 import agents.research_agent.agent
 import agents.script_agent.agent
 from core.registry import AgentRegistry
-from core.schemas.agent import AgentOutput
+from core.schemas.agent import AgentOutput, CostInfo
 from core.stub_agent import StubAgent
 
-from app.models import Approval, Project, ResearchNote, Script
+from app.models import AgentRun, Approval, Project, ResearchNote, Script
 from app.services.orchestrator import ProjectNotFoundError, run_project
 from app.services.style_profile import create_style_profile
 
@@ -86,6 +86,7 @@ def test_run_project_persists_research_and_script(client, monkeypatch):
                     status="success",
                     result={"summary": "A demo repo.", "key_points": ["one", "two"], "raw_text": "digest"},
                     next_event="research.completed",
+                    cost=CostInfo(tokens_used=500, cost_usd=0.01, provider="anthropic"),
                 )
             ),
         )
@@ -103,11 +104,12 @@ def test_run_project_persists_research_and_script(client, monkeypatch):
                         "hashtags": ["#tag"],
                     },
                     next_event="script.drafted",
+                    cost=CostInfo(tokens_used=300, cost_usd=0.02, provider="anthropic"),
                 )
             ),
         )
         monkeypatch.setattr("workflows.graph.score_idea", lambda **kwargs: __import__("types").SimpleNamespace(
-            total=100.0, breakdown={"novelty": 25, "audience_relevance": 25, "source_reliability": 25, "visual_potential": 25}
+            total=100.0, cost_usd=0.001, tokens_used=150, breakdown={"novelty": 25, "audience_relevance": 25, "source_reliability": 25, "visual_potential": 25}
         ))
 
         result = run_project(db, project.id, registry=_registry_with_real_research_and_script())
@@ -133,6 +135,20 @@ def test_run_project_persists_research_and_script(client, monkeypatch):
         assert approval.project_id == project.id
         assert approval.stage == "script"
         assert approval.status == "pending"
+
+        # Cost tracking: every real Agent/scoring call in this run
+        # (research_agent, idea_scoring, script_agent — the stubbed
+        # knowledge/recording/video/voice/publishing nodes contribute
+        # $0 rows too) should now be a real agent_runs row.
+        assert abs(result["total_cost_usd"] - 0.031) < 1e-9
+        runs = db.query(AgentRun).filter(AgentRun.project_id == project.id).all()
+        run_names = {r.agent_name for r in runs}
+        assert "research_agent" in run_names
+        assert "idea_scoring" in run_names
+        assert "script_agent" in run_names
+        research_run = next(r for r in runs if r.agent_name == "research_agent")
+        assert float(research_run.cost_usd) == 0.01
+        assert research_run.tokens_used == 500
     finally:
         db.close()
 
@@ -155,7 +171,7 @@ def test_run_project_rejected_idea_persists_research_but_no_script(client, monke
             ),
         )
         monkeypatch.setattr("workflows.graph.score_idea", lambda **kwargs: __import__("types").SimpleNamespace(
-            total=10.0, breakdown={"novelty": 5, "audience_relevance": 5, "source_reliability": 0, "visual_potential": 0}
+            total=10.0, cost_usd=0.0, tokens_used=0, breakdown={"novelty": 5, "audience_relevance": 5, "source_reliability": 0, "visual_potential": 0}
         ))
 
         result = run_project(db, project.id, registry=_registry_with_real_research_and_script())
@@ -189,7 +205,7 @@ def test_run_project_seeds_style_profile_into_script_payload(client, monkeypatch
             ),
         )
         monkeypatch.setattr("workflows.graph.score_idea", lambda **kwargs: __import__("types").SimpleNamespace(
-            total=100.0, breakdown={}
+            total=100.0, cost_usd=0.0, tokens_used=0, breakdown={}
         ))
 
         received = []
@@ -242,7 +258,7 @@ def test_run_route_returns_200_and_persists(client, monkeypatch):
         ),
     )
     monkeypatch.setattr("workflows.graph.score_idea", lambda **kwargs: __import__("types").SimpleNamespace(
-        total=100.0, breakdown={}
+        total=100.0, cost_usd=0.0, tokens_used=0, breakdown={}
     ))
     # The route uses the real default_registry, which agents/*/agent.py
     # modules populate as an import side-effect when apps.api.app.main

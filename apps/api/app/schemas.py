@@ -112,6 +112,7 @@ class ProjectRunOut(BaseModel):
     script_id: str | None
     script: ScriptResultOut | None
     approval_id: str | None = None
+    total_cost_usd: float = 0.0
 
 
 class PromptCreate(BaseModel):

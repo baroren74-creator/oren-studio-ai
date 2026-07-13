@@ -5,6 +5,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — real cost tracking (Ops page + per-run total)
+- Raised directly by Oren after a live cost-safety conversation: the
+  Ops page (`apps/web/app/ops/page.tsx`) had existed since Phase 1 but
+  always showed "No agent runs yet" — every real Agent already
+  computes real cost via LiteLLM's `completion_cost()`, but nothing
+  ever persisted it.
+- `workflows/graph.py`: `StudioState.agent_costs` accumulates one entry
+  per real Agent/scoring call across a graph run.
+  `workflows/idea_scoring.py`'s `IdeaScore` gained `cost_usd`/
+  `tokens_used` too (idea scoring runs on every project, including
+  rejected ones).
+- `apps/api/app/services/agent_runs.py`: `persist_agent_runs()` turns
+  that list into real `AgentRun` rows. `orchestrator.py`'s
+  `run_project()` calls it and returns the total as
+  `ProjectRunOut.total_cost_usd`.
+- `apps/web/app/ops/page.tsx`: shows a running total (6-decimal
+  precision — real per-call costs are often well under a cent) instead
+  of an always-empty table. `apps/web/app/projects/[id]/page.tsx`:
+  shows each run's own cost with a link to Ops.
+- Tests: `apps/api/tests/test_agent_runs.py` (4 cases) plus
+  `test_orchestrator.py` assertions. Full suite: 151 tests passing.
+  `apps/web`: `tsc --noEmit` and `next build` clean.
+
 ### Fixed — apps/web's Projects page had no way back to an existing project
 - Found live: the page was only ever the "New Project" creation form.
 - `GET /api/projects`: list all projects, most recent first.

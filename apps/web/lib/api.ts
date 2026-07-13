@@ -75,6 +75,7 @@ export type ProjectRun = {
   script_id: string | null;
   script: ScriptResult | null;
   approval_id: string | null;
+  total_cost_usd: number;
 };
 
 // Phase 3.6, Approval Gate #1 — see

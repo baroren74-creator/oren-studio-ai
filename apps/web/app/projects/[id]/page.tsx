@@ -137,6 +137,10 @@ export default function ProjectTimelinePage() {
             Idea score: <strong>{lastRun.idea_score ?? "n/a"}</strong>
             {lastRun.rejected && <span style={{ color: "crimson" }}> — rejected, below threshold</span>}
           </p>
+          <p>
+            Cost of this run: <strong>${lastRun.total_cost_usd.toFixed(6)}</strong> — see the{" "}
+            <a href="/ops">Ops page</a> for the running total across every run.
+          </p>
 
           {lastRun.script ? (
             <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 640 }}>

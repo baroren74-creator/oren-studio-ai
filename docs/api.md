@@ -21,9 +21,12 @@ POST   /api/projects/{id}/run            v0 synchronous graph run — done (Phas
                                           services/orchestrator-worker). Persists a ResearchNote
                                           and, if the idea passed scoring, a Script. Returns
                                           ProjectRunOut: run_id, events, rejected, interrupted,
-                                          idea_score, research_note_id, script_id, script, approval_id.
-                                          A successfully persisted Script always creates a pending
-                                          Approval(stage="script") alongside it — see below.
+                                          idea_score, research_note_id, script_id, script, approval_id,
+                                          total_cost_usd. A successfully persisted Script always creates
+                                          a pending Approval(stage="script") alongside it — see below.
+                                          Also persists a real agent_runs row per Agent/scoring call made
+                                          during the run (apps/api/app/services/agent_runs.py) — this is
+                                          what powers GET /api/agent-runs and apps/web's Ops page total.
 GET    /api/projects/{id}/approvals      all approvals for a project, still-pending ones first — done
                                           (Phase 3.6)
 

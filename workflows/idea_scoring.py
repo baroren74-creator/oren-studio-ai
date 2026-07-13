@@ -71,6 +71,12 @@ class IdeaScore:
     breakdown: dict[str, int] = field(default_factory=dict)
     rationale: dict[str, str] = field(default_factory=dict)
     scored_by: str = "idea_scoring@0.1.0"
+    # Cost of the one LLM call this function makes — llm_provider.complete()
+    # already computes this (via litellm.completion_cost()); previously
+    # nothing read it back out. See workflows/graph.py's idea_scoring_node
+    # for where this reaches agent_costs / apps/api's agent_runs table.
+    cost_usd: float = 0.0
+    tokens_used: int = 0
 
 
 class IdeaScoringError(RuntimeError):
@@ -145,6 +151,8 @@ def score_idea(*, summary: str, key_points: list[str] | None = None, model: str 
         breakdown=breakdown,
         rationale=rationale,
         scored_by=f"idea_scoring@0.1.0:{response.model}",
+        cost_usd=response.cost_usd,
+        tokens_used=response.input_tokens + response.output_tokens,
     )
 
 

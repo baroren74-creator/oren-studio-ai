@@ -476,6 +476,32 @@ in case scheduled/automated posting is wanted later.
     list above the form, linking to each `/projects/{id}`. Tests:
     `apps/api/tests/test_projects.py` (3 cases). Full suite: 147 tests
     passing.
+
+    Second out-of-sequence fix, raised directly by Oren after a live
+    cost-safety conversation: 1.17's Ops view (`agent_runs` table) had
+    existed since Phase 1 but always showed "No agent runs yet" — every
+    real Agent already computes real cost (`core.schemas.agent.CostInfo`,
+    from LiteLLM's own `completion_cost()`) on its `AgentOutput`, but
+    nothing ever read that back out of a graph run and persisted it.
+    `workflows/graph.py`'s `StudioState` gained `agent_costs`
+    (`Annotated[list[dict], add]`, one entry per real Agent/scoring
+    call, appended by `_agent_event`/`research_node`/`script_node`/
+    `publishing_node`/`idea_scoring_node` via a shared `_cost_entry()`
+    helper). `workflows/idea_scoring.py`'s `IdeaScore` gained
+    `cost_usd`/`tokens_used` for the same reason (idea scoring makes a
+    real LLM call on every run, including rejected ones, so it's often
+    the single most-frequent cost source). `apps/api/app/services/
+    agent_runs.py`'s `persist_agent_runs()` turns that list into real
+    `AgentRun` rows; `orchestrator.py`'s `run_project()` calls it after
+    every graph run and returns the total as `ProjectRunOut.
+    total_cost_usd`. `apps/web/app/ops/page.tsx` now shows a running
+    total (formatted to 6 decimals — per-call costs are often well under
+    a cent) instead of always being empty; the project page shows each
+    run's own cost with a link to Ops. Tests: `apps/api/tests/
+    test_agent_runs.py` (4 cases) plus `test_orchestrator.py`
+    assertions that a run's real Agent costs become real `AgentRun`
+    rows with the correct total. Full suite: 151 tests passing.
+    `apps/web`: `npx tsc --noEmit` and `npm run build` both clean.
 3.7 Storyboard Agent: **custom LLM-prompting module** (structured JSON:
     scene, duration, visual instruction, caption cue) — no mature OSS
     library exists for this (see `docs/open-source-landscape.md` section

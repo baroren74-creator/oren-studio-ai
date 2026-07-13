@@ -37,6 +37,7 @@ from core.schemas.agent import AgentOutput
 from workflows.graph import build_graph
 
 from app.models import Project
+from app.services.agent_runs import persist_agent_runs
 from app.services.approvals import create_approval
 from app.services.research import persist_research_note, update_idea_score
 from app.services.script import persist_script
@@ -148,6 +149,16 @@ def run_project(db: Session, project_id: str, *, registry: AgentRegistry | None 
             approval = create_approval(db, project_id=project.id, stage="script")
             approval_id = approval.id
 
+    # Cost tracking (found live to be a real gap: every real Agent
+    # already computes its own cost, but nothing previously persisted
+    # it — see app.services.agent_runs's module docstring).
+    agent_runs = persist_agent_runs(db, project_id=project.id, agent_costs=final_state.get("agent_costs", []))
+    # AgentRun.cost_usd is a SQLAlchemy Numeric column — reads back as
+    # decimal.Decimal, not float, on at least some backends. Cast
+    # explicitly: Decimal + float raises TypeError, and this needs to be
+    # a plain JSON-serializable number for ProjectRunOut anyway.
+    total_cost_usd = sum(float(run.cost_usd or 0.0) for run in agent_runs)
+
     return {
         "run_id": run_id,
         "events": list(final_state.get("events", [])),
@@ -158,4 +169,5 @@ def run_project(db: Session, project_id: str, *, registry: AgentRegistry | None 
         "script_id": script_id,
         "script": script_result,
         "approval_id": approval_id,
+        "total_cost_usd": total_cost_usd,
     }

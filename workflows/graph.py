@@ -69,6 +69,14 @@ class StudioState(TypedDict, total=False):
     script_caption: str | None
     script_title: str | None
     script_hashtags: list[str] | None
+    # One entry per real Agent call ({"agent_name", "status",
+    # "tokens_used", "cost_usd", "provider"} — see _cost_entry()) — every
+    # Agent already computes this on its AgentOutput.cost (CostInfo), but
+    # nothing previously read it back out of the graph. Whatever calls
+    # graph.invoke() for real is responsible for persisting these as
+    # agent_runs rows (apps/api/app/services/agent_runs.py) — same
+    # "graph never touches the DB" split every other field here follows.
+    agent_costs: Annotated[list[dict[str, Any]], add]
 
 
 IDEA_SCORE_THRESHOLD = 50.0  # ADR-003: below this, idea.rejected — stops before expensive stages
@@ -104,6 +112,25 @@ def _run_agent_sync(
     return output.model_dump()
 
 
+def _cost_entry(agent_name: str, out: dict[str, Any]) -> dict[str, Any]:
+    """Turn one Agent call's raw output dict (from _run_agent_sync) into
+    an `agent_costs` entry. Every real Agent already returns a `cost`
+    (CostInfo — core.schemas.agent) computed from its actual LiteLLM
+    call (providers/llm/llm_provider/client.py's `litellm.
+    completion_cost()`); Stub Agents return the CostInfo default
+    (0 tokens, $0), which still records a real, zero-cost row — useful
+    for the Ops view's original "debug a pipeline run" purpose
+    (docs/roadmap.md 1.17), not just cost visibility."""
+    cost = out.get("cost") or {}
+    return {
+        "agent_name": agent_name,
+        "status": out.get("status", "success"),
+        "tokens_used": cost.get("tokens_used", 0),
+        "cost_usd": cost.get("cost_usd", 0.0),
+        "provider": cost.get("provider"),
+    }
+
+
 def _agent_event(
     registry: AgentRegistry, agent_name: str, state: StudioState, payload: dict[str, Any] | None = None
 ) -> dict:
@@ -113,7 +140,10 @@ def _agent_event(
     letting `None` leak into the `events` list — see research_node for
     the case this was written for (a "skipped" ResearchAgent run)."""
     out = _run_agent_sync(registry, agent_name, state, payload=payload)
-    return {"events": [out["next_event"]] if out["next_event"] else []}
+    return {
+        "events": [out["next_event"]] if out["next_event"] else [],
+        "agent_costs": [_cost_entry(agent_name, out)],
+    }
 
 
 def build_graph(registry: AgentRegistry | None = None):
@@ -131,7 +161,10 @@ def build_graph(registry: AgentRegistry | None = None):
         # default.
         payload = {"source_type": state.get("source_type"), "source_url": state.get("source_url")}
         out = _run_agent_sync(reg, "research_agent", state, payload=payload)
-        update: dict[str, Any] = {"events": [out["next_event"]] if out["next_event"] else []}
+        update: dict[str, Any] = {
+            "events": [out["next_event"]] if out["next_event"] else [],
+            "agent_costs": [_cost_entry("research_agent", out)],
+        }
         # Only set research_summary/key_points when the Agent's result
         # actually has them (a real, successful ResearchAgent run) —
         # deliberately does NOT overwrite with None on every run, so a
@@ -181,11 +214,25 @@ def build_graph(registry: AgentRegistry | None = None):
         try:
             score = score_idea(summary=summary, key_points=state.get("research_key_points"))
         except IdeaScoringError:
+            # A real LLM call may still have been made (and billed) before
+            # this raised (e.g. a malformed JSON response) — score_idea()
+            # doesn't currently surface cost on its failure path, so this
+            # is a known, documented gap, not an oversight: better to
+            # under-report cost here than guess at a number.
             return {"idea_score": 0.0, "events": ["idea.scored"]}
         return {
             "idea_score": score.total,
             "idea_score_breakdown": score.breakdown,
             "events": ["idea.scored"],
+            "agent_costs": [
+                {
+                    "agent_name": "idea_scoring",
+                    "status": "success",
+                    "tokens_used": score.tokens_used,
+                    "cost_usd": score.cost_usd,
+                    "provider": None,
+                }
+            ],
         }
 
     def route_after_scoring(state: StudioState) -> str:
@@ -210,7 +257,10 @@ def build_graph(registry: AgentRegistry | None = None):
             "style_avg_length_seconds": state.get("style_avg_length_seconds"),
         }
         out = _run_agent_sync(reg, "script_agent", state, payload=payload)
-        update: dict[str, Any] = {"events": [out["next_event"]] if out["next_event"] else []}
+        update: dict[str, Any] = {
+            "events": [out["next_event"]] if out["next_event"] else [],
+            "agent_costs": [_cost_entry("script_agent", out)],
+        }
         # Same "only promote on an actual successful real-Agent result"
         # guard as research_node — a Stub Agent's result has no "hook"
         # key, so this can't clobber a value a test pre-seeded.
@@ -269,7 +319,10 @@ def build_graph(registry: AgentRegistry | None = None):
         # publish API call — Oren uploads manually and marks it
         # published himself (apps/api route, not this graph).
         out = _run_agent_sync(reg, "publishing_agent", state)
-        return {"events": [out["next_event"], "publish.approved"]}
+        return {
+            "events": [out["next_event"], "publish.approved"],
+            "agent_costs": [_cost_entry("publishing_agent", out)],
+        }
 
     graph = StateGraph(StudioState)
 
