@@ -17,6 +17,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     throw new Error(`${init?.method ?? "GET"} ${path} failed: ${res.status}`);
   }
+  if (res.status === 204) {
+    // e.g. DELETE /api/prompt-library/{id} — no body to parse.
+    return undefined as T;
+  }
   return res.json() as Promise<T>;
 }
 
@@ -72,6 +76,19 @@ export type ProjectRun = {
   script: ScriptResult | null;
 };
 
+// Phase 3.5 — see apps/api/app/services/prompt_library.py's module
+// docstring for the versioning model (edit = new row + parent_id,
+// never an in-place update).
+export type Prompt = {
+  id: string;
+  name: string;
+  category: string | null;
+  prompt_text: string | null;
+  version: number;
+  parent_id: string | null;
+  created_at: string;
+};
+
 export const api = {
   createProject: (body: { title?: string; source_type: string; source_url: string }) =>
     request<Project>("/api/projects", { method: "POST", body: JSON.stringify(body) }),
@@ -79,4 +96,12 @@ export const api = {
   getProjectTimeline: (id: string) => request<AgentEvent[]>(`/api/projects/${id}/timeline`),
   listAgentRuns: () => request<AgentRun[]>("/api/agent-runs"),
   runProject: (id: string) => request<ProjectRun>(`/api/projects/${id}/run`, { method: "POST" }),
+
+  listPrompts: () => request<Prompt[]>("/api/prompt-library"),
+  createPrompt: (body: { name: string; category?: string; prompt_text?: string }) =>
+    request<Prompt>("/api/prompt-library", { method: "POST", body: JSON.stringify(body) }),
+  getPromptHistory: (id: string) => request<Prompt[]>(`/api/prompt-library/${id}/history`),
+  createPromptVersion: (id: string, body: { prompt_text?: string; category?: string }) =>
+    request<Prompt>(`/api/prompt-library/${id}/versions`, { method: "POST", body: JSON.stringify(body) }),
+  deletePrompt: (id: string) => request<void>(`/api/prompt-library/${id}`, { method: "DELETE" }),
 };

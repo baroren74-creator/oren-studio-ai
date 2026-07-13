@@ -4,12 +4,13 @@ Phase 1 scope (docs/roadmap.md 1.8) was exactly: projects, sources,
 agent_runs, agent_events, approvals. `research_notes` was added in Phase
 2.3 alongside the real Research Agent (agents/research_agent/agent.py),
 `style_profile` in Phase 3.1 alongside the style questionnaire, `scripts`
-in Phase 3.2-3.4 alongside the real Script Agent — each the first table
-added incrementally as the feature that needs it landed, per the Phase 1
-note below. The rest of docs/database.md's schema (ideas, storyboards,
-assets, videos, publications, memory_entries, prompt_library,
-favorite_tools, brand_assets) is still added incrementally in later
-phases as those features are built — not all at once here.
+in Phase 3.2-3.4 alongside the real Script Agent, `prompt_library` in
+Phase 3.5 alongside its CRUD UI — each the first table added
+incrementally as the feature that needs it landed, per the Phase 1 note
+below. The rest of docs/database.md's schema (ideas, storyboards,
+assets, videos, publications, memory_entries, favorite_tools,
+brand_assets) is still added incrementally in later phases as those
+features are built — not all at once here.
 """
 
 from __future__ import annotations
@@ -180,3 +181,33 @@ class Script(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     project: Mapped["Project"] = relationship(back_populates="scripts")
+
+
+class PromptLibraryEntry(Base):
+    """One version of one prompt (docs/database.md's `prompt_library`) —
+    Phase 3.5. Versioned via a `parent_id` chain, not an in-place update
+    (docs/architecture.md section 9.5: "Versioning for the Style Guide
+    and Prompt Library is already in the schema (version, parent_id) —
+    make sure the UI shows a Diff between versions, not just an
+    'update'"). Editing a prompt inserts a new row with `parent_id`
+    pointing at the row being edited and `version = parent.version + 1`;
+    the old row is never mutated or deleted, so the full history is
+    always reconstructible by following `parent_id` back to a row with
+    `parent_id IS NULL` (`version == 1`).
+
+    `name` identifies a prompt "family" across versions (every row in
+    one version chain shares the same `name`) — this is an
+    application-level convention enforced in
+    `app/services/prompt_library.py`, not a DB constraint, matching how
+    `style_profile` also enforces its versioning invariants in the
+    service layer rather than in SQL."""
+
+    __tablename__ = "prompt_library"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    name: Mapped[str] = mapped_column(String)
+    category: Mapped[str | None] = mapped_column(String)
+    prompt_text: Mapped[str | None] = mapped_column(Text)
+    version: Mapped[int] = mapped_column(default=1)
+    parent_id: Mapped[str | None] = mapped_column(ForeignKey("prompt_library.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

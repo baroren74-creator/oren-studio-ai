@@ -30,7 +30,15 @@ POST   /api/approvals/{id}/request-edit  {notes}
 GET    /api/knowledge/search?q=...       semantic search — done (Phase 2.9), currently returns Qdrant's
                                           own payload, not yet Postgres-hydrated (no sources rows persisted
                                           yet — see docs/agents.md's Knowledge Agent section)
-POST   /api/prompt-library
+POST   /api/prompt-library                start a new prompt at version 1 — done (Phase 3.5)
+GET    /api/prompt-library                 current (highest) version of every prompt — done
+GET    /api/prompt-library/{id}            one specific version, any version — done
+GET    /api/prompt-library/{id}/history    full version chain for that prompt's family, oldest first — done
+POST   /api/prompt-library/{id}/versions   edit = new version (parent_id set), never an in-place update — done
+DELETE /api/prompt-library/{id}            removes every version in the family, not just one — done
+                                            See apps/api/app/services/prompt_library.py's module docstring
+                                            for the versioning model. apps/web's Prompts page renders a diff
+                                            between versions per docs/architecture.md section 9.5.
 POST   /api/style-profile                create a new version (Phase 3.1's questionnaire) — done
 GET    /api/style-profile/current        highest version, 404 if none created yet — done
 ```

@@ -5,6 +5,38 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — apps/api had no CORS headers
+- `apps/api/app/main.py`: added `CORSMiddleware` (wide open —
+  single-user local tool, header-based API key auth, no cookie/session
+  auth to protect). Found live: `apps/web` calling `apps/api` from the
+  browser failed with a generic "Failed to fetch" and no server-side
+  log at all — the browser blocks cross-origin requests before they
+  reach any route when the server doesn't send CORS headers.
+
+### Added — Phase 3.5: Prompt Library (CRUD + versioning)
+- `apps/api/app/models.py`: new `PromptLibraryEntry` (table
+  `prompt_library`, matching docs/database.md). Versioned via a
+  `parent_id` chain, never updated in place — editing inserts a new row
+  with `parent_id` pointing at the version it was edited from.
+  Migration:
+  `alembic/versions/9d2c4a7e1f6b_add_prompt_library_table.py`.
+- `apps/api/app/services/prompt_library.py`: `create_prompt`,
+  `create_new_version`, `list_current_prompts` (latest version per
+  name), `get_prompt_history` (full chain, oldest first),
+  `delete_prompt_family` (whole version chain, not one row).
+- Routes: `POST`/`GET /api/prompt-library`, `GET /{id}`, `GET
+  /{id}/history`, `POST /{id}/versions`, `DELETE /{id}`.
+- `apps/web/app/prompts/page.tsx`: replaces the Phase 1 placeholder —
+  CRUD UI with a live word-level diff (via the `diff` npm package)
+  between the saved version and an in-progress edit, and the same diff
+  between each pair of consecutive versions in a history view — per
+  docs/architecture.md section 9.5's explicit requirement that the UI
+  show a Diff between versions, not silently apply an "update".
+  `apps/web/lib/api.ts` gained the `Prompt` type and matching wrappers.
+- Tests: `apps/api/tests/test_prompt_library.py` (18 cases). Full
+  suite: 130 tests passing (`make test`). `apps/web`: `npx tsc
+  --noEmit` and `npm run build` both clean.
+
 ### Added — Phase 3.4.5: orchestrator wiring + apps/web visibility (v0, out-of-sequence)
 - `apps/api/app/services/orchestrator.py`: new `run_project()` — the
   first thing in this repo that actually invokes

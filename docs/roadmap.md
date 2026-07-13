@@ -374,7 +374,53 @@ in case scheduled/automated posting is wanted later.
     route's 200 and 404 paths). Full suite: 112 tests passing
     (`make test`). `apps/web`: `npx tsc --noEmit` and `npm run build`
     both clean.
-3.5 Prompt Library UI (CRUD + versioning).
+3.5 Prompt Library UI (CRUD + versioning). **Done.** Versioning follows
+    `docs/database.md`'s exact schema: `prompt_library` rows are never
+    updated in place — editing inserts a new row with `parent_id`
+    pointing at the version it was edited from and `version = parent +
+    1`. `name` identifies a version "family" across rows (application
+    convention, not a DB constraint — same choice `style_profile`'s
+    versioning already made). Per `docs/architecture.md` section 9.5
+    ("make sure the UI shows a Diff between versions, not just an
+    'update'"), `apps/web`'s Prompts page renders a live word-level diff
+    (the `diff` npm package's `diffWords`) between the saved version and
+    whatever's being typed before a save, and the same diff between each
+    consecutive pair of versions in the history view — this is the
+    actual reason old versions are kept intact rather than overwritten.
+
+    `app/services/prompt_library.py`: `create_prompt` (version 1, no
+    parent), `create_new_version` (inherits `name`, inherits `category`
+    unless overridden, raises `PromptNotFoundError` for an unknown
+    parent), `list_current_prompts` (one row per family — the
+    highest-version row for each distinct `name`, reduced in Python
+    rather than a window-function query, since this is a single-user
+    dataset small enough that the simpler code wins — same reasoning
+    used throughout this codebase), `get_prompt_history` (full chain by
+    `name`, oldest first), `delete_prompt_family` (removes every version
+    sharing a `name`, newest-first to respect the `parent_id` FK — "delete
+    this prompt" removes its whole history, not one version at a time).
+
+    Routes: `POST /api/prompt-library`, `GET /api/prompt-library` (list
+    current), `GET /api/prompt-library/{id}`, `GET
+    /api/prompt-library/{id}/history`, `POST
+    /api/prompt-library/{id}/versions` (edit), `DELETE
+    /api/prompt-library/{id}` (whole family). Migration:
+    `apps/api/alembic/versions/9d2c4a7e1f6b_add_prompt_library_table.py`.
+
+    `apps/web/app/prompts/page.tsx`: replaces the Phase 1 placeholder —
+    list of current prompts, a create form, and (once a prompt is
+    selected) an editable textarea with a live diff against the saved
+    version, a "Save as new version" button, a delete button, and a
+    history panel diffing each version against the one before it.
+    `apps/web/lib/api.ts` gained the `Prompt` type and
+    `listPrompts`/`createPrompt`/`getPromptHistory`/
+    `createPromptVersion`/`deletePrompt`.
+
+    Tests: `apps/api/tests/test_prompt_library.py` (18 cases — service
+    layer versioning/history/list/delete invariants, route layer
+    200/201/204/404s, auth). Full suite: 130 tests passing (`make
+    test`). `apps/web`: `npx tsc --noEmit` and `npm run build` both
+    clean.
 3.6 Approval Gate #1: review/edit script before continuing.
 3.7 Storyboard Agent: **custom LLM-prompting module** (structured JSON:
     scene, duration, visual instruction, caption cue) — no mature OSS

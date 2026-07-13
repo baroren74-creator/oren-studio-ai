@@ -111,3 +111,32 @@ class ProjectRunOut(BaseModel):
     research_note_id: str | None
     script_id: str | None
     script: ScriptResultOut | None
+
+
+class PromptCreate(BaseModel):
+    """POST /api/prompt-library — starts a new prompt at version 1."""
+
+    name: str
+    category: str | None = None
+    prompt_text: str | None = None
+
+
+class PromptVersionCreate(BaseModel):
+    """POST /api/prompt-library/{id}/versions — edits a prompt by
+    creating the next version in its chain. `name` isn't accepted here:
+    a version can't switch families, see app.services.prompt_library."""
+
+    prompt_text: str | None = None
+    category: str | None = None
+
+
+class PromptOut(BaseModel):
+    id: str
+    name: str
+    category: str | None
+    prompt_text: str | None
+    version: int
+    parent_id: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
