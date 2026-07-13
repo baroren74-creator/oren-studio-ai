@@ -30,6 +30,9 @@ export type Project = {
   status: string;
   source_type: string | null;
   source_url: string | null;
+  // Phase 3.9 — only meaningful when source_type is reel|post|tweet, see
+  // agents/research_agent/agent.py's module docstring.
+  source_text: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -129,7 +132,7 @@ export type Prompt = {
 
 export const api = {
   listProjects: () => request<Project[]>("/api/projects"),
-  createProject: (body: { title?: string; source_type: string; source_url: string }) =>
+  createProject: (body: { title?: string; source_type: string; source_url: string; source_text?: string }) =>
     request<Project>("/api/projects", { method: "POST", body: JSON.stringify(body) }),
   getProject: (id: string) => request<Project>(`/api/projects/${id}`),
   getProjectTimeline: (id: string) => request<AgentEvent[]>(`/api/projects/${id}/timeline`),

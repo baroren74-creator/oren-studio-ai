@@ -43,6 +43,15 @@ class Project(Base):
     source_type: Mapped[str | None] = mapped_column(String)
     # github|youtube|reel|post|tweet|website|idea
     source_url: Mapped[str | None] = mapped_column(String)
+    # Phase 3.9: only meaningful when source_type is reel|post|tweet — the
+    # caption/transcript pasted in manually, since there's no reliable,
+    # ToS-clean automated fetch for those source types (see
+    # agents/research_agent/agent.py's module docstring). Not in
+    # docs/database.md's original minimal `projects` listing — added here
+    # the same "this file may add bookkeeping/feature columns beyond the
+    # doc's schema sketch" way apps/api/app/models.py's Storyboard.created_at
+    # already does.
+    source_text: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now, onupdate=_now)
 

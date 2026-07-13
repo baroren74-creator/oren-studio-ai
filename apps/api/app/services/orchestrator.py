@@ -87,6 +87,9 @@ def run_project(db: Session, project_id: str, *, registry: AgentRegistry | None 
         "run_id": run_id,
         "source_type": project.source_type,
         "source_url": project.source_url,
+        # Phase 3.9: only meaningful for manual-text source types
+        # (reel/post/tweet) — see workflows/graph.py's StudioState comment.
+        "source_text": project.source_text,
         "events": [],
     }
     if style_profile is not None:

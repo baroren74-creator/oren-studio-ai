@@ -19,10 +19,12 @@ end-to-end (with a matching "Run" button in `apps/web`), a
 CRUD + versioning Prompt Library (with a diff view between versions),
 Approval Gate #1 (review/approve/reject/request-edit a drafted script),
 the Storyboard module (a drafted script turned into an ordered scene
-breakdown), and a real Storyboard view with a proper design system for
+breakdown), a real Storyboard view with a proper design system for
 `apps/web` (dark-first, one accent color, reusable card/button/badge
-primitives) are done. See `docs/roadmap.md` for the exact state of
-every item.
+primitives), and manual-text sources for Instagram Reels/posts/tweets
+(no reliable automated fetch exists — paste the caption/transcript
+instead) are done. See `docs/roadmap.md` for the exact state of every
+item.
 
 ## Repository layout
 

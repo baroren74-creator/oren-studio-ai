@@ -213,6 +213,44 @@ def test_run_project_rejected_idea_persists_research_but_no_script(client, monke
         db.close()
 
 
+def test_run_project_threads_source_text_to_real_research_agent(client, monkeypatch):
+    """Phase 3.9: a reel/post/tweet project's pasted source_text must
+    reach the real ResearchAgent's payload — regression test for the
+    exact bug class research_node/script_node already have their own
+    tests for (see test_research_node_passes_source_fields_to_real_agent
+    in test_smoke_e2e.py): a field silently staying at the empty-payload
+    default because a caller in the chain forgot to forward it."""
+    from app.db import SessionLocal
+
+    db = SessionLocal()
+    try:
+        project = _make_project(
+            db,
+            source_type="reel",
+            source_url="https://www.instagram.com/reel/ABC123/",
+            source_text="20 minute dinner using 5 ingredients you already have",
+        )
+
+        received = []
+
+        async def _fake_research_run(self, input):
+            received.append(input)
+            return AgentOutput(status="success", result={"summary": "s", "key_points": []}, next_event="research.completed")
+
+        monkeypatch.setattr("agents.research_agent.agent.ResearchAgent.run", _fake_research_run)
+        monkeypatch.setattr("workflows.graph.score_idea", lambda **kwargs: __import__("types").SimpleNamespace(
+            total=0.0, cost_usd=0.0, tokens_used=0, breakdown={}
+        ))
+
+        run_project(db, project.id, registry=_registry_with_real_research_and_script())
+
+        assert len(received) == 1
+        assert received[0].payload["source_type"] == "reel"
+        assert received[0].payload["source_text"] == "20 minute dinner using 5 ingredients you already have"
+    finally:
+        db.close()
+
+
 def test_run_project_seeds_style_profile_into_script_payload(client, monkeypatch):
     from app.db import SessionLocal
 

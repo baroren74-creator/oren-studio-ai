@@ -297,3 +297,115 @@ async def test_github_source_live_fetch_does_not_raise_asyncio_error():
     digest = await fetch_repo_digest("https://github.com/octocat/Hello-World")
 
     assert "hello-world" in digest.summary.lower()
+
+
+# ---------------------------------------------------------------------
+# 6. manual-text source types (reel/post/tweet) — Phase 3.9. No fetch at
+#    all here (see this module's docstring for why Instagram scraping
+#    isn't a real Agent's job) — only `complete` needs mocking.
+# ---------------------------------------------------------------------
+
+
+FAKE_REEL_LLM_TEXT = (
+    "The post shows a quick before/after of a home-cooked recipe, framed "
+    "as a fast weeknight dinner idea.\n"
+    "- Under 20 minutes total\n"
+    "- Uses 5 common ingredients\n"
+    "- Strong hook in the first 2 seconds"
+)
+
+
+@pytest.mark.asyncio
+async def test_manual_text_happy_path_returns_parsed_summary_and_key_points():
+    fake_response = LLMResponse(
+        text=FAKE_REEL_LLM_TEXT,
+        model="anthropic/claude-3-5-sonnet-20241022",
+        input_tokens=70,
+        output_tokens=35,
+        cost_usd=0.0012,
+    )
+
+    with patch.object(ra_module, "complete", return_value=fake_response) as mock_complete:
+        out = await AGENT.run(
+            _input(
+                {
+                    "source_type": "reel",
+                    "source_url": "https://www.instagram.com/reel/ABC123/",
+                    "source_text": "20 minute dinner using 5 ingredients you already have #cooking",
+                }
+            )
+        )
+
+    mock_complete.assert_called_once()
+
+    assert out.status == "success"
+    assert out.next_event == "research.completed"
+    assert out.result["source_url"] == "https://www.instagram.com/reel/ABC123/"
+    assert out.result["raw_text"] == "20 minute dinner using 5 ingredients you already have #cooking"
+    assert "recipe" in out.result["summary"]
+    assert len(out.result["key_points"]) == 3
+
+
+@pytest.mark.asyncio
+async def test_manual_text_works_for_post_and_tweet_too():
+    fake_response = LLMResponse(text="A short post.", model="m", input_tokens=10, output_tokens=5, cost_usd=0.0)
+    with patch.object(ra_module, "complete", return_value=fake_response):
+        for source_type in ("post", "tweet"):
+            out = await AGENT.run(
+                _input({"source_type": source_type, "source_url": "https://example.com/x", "source_text": "hello"})
+            )
+            assert out.status == "success"
+
+
+@pytest.mark.asyncio
+async def test_manual_text_rejects_missing_source_text():
+    out = await AGENT.run(_input({"source_type": "reel", "source_url": "https://www.instagram.com/reel/ABC123/"}))
+
+    assert out.status == "failed"
+    assert "source_text" in out.result["reason"]
+
+
+@pytest.mark.asyncio
+async def test_manual_text_rejects_blank_source_text():
+    out = await AGENT.run(
+        _input(
+            {
+                "source_type": "reel",
+                "source_url": "https://www.instagram.com/reel/ABC123/",
+                "source_text": "   ",
+            }
+        )
+    )
+
+    assert out.status == "failed"
+    assert "source_text" in out.result["reason"]
+
+
+@pytest.mark.asyncio
+async def test_manual_text_does_not_require_source_url():
+    # source_url is a reference link, never dereferenced for manual-text
+    # types — a run with no link at all still has something to work
+    # with as long as source_text is present.
+    fake_response = LLMResponse(text="A short post.", model="m", input_tokens=10, output_tokens=5, cost_usd=0.0)
+    with patch.object(ra_module, "complete", return_value=fake_response):
+        out = await AGENT.run(_input({"source_type": "reel", "source_text": "hello"}))
+
+    assert out.status == "success"
+    assert out.result["source_url"] is None
+
+
+@pytest.mark.asyncio
+async def test_manual_text_llm_failure_is_caught_not_raised():
+    with patch.object(ra_module, "complete", side_effect=LLMError("Missing Anthropic API Key")):
+        out = await AGENT.run(
+            _input(
+                {
+                    "source_type": "reel",
+                    "source_url": "https://www.instagram.com/reel/ABC123/",
+                    "source_text": "hello",
+                }
+            )
+        )
+
+    assert out.status == "failed"
+    assert "Missing Anthropic API Key" in out.result["reason"]

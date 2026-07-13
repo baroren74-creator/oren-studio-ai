@@ -16,6 +16,11 @@ class ProjectCreate(BaseModel):
     title: str | None = None
     source_type: str
     source_url: str
+    # Phase 3.9: the caption/transcript pasted in manually — only read by
+    # the Research Agent when source_type is reel|post|tweet (see
+    # agents/research_agent/agent.py's module docstring for why there's
+    # no automated fetch for those source types).
+    source_text: str | None = None
 
 
 class ProjectOut(BaseModel):
@@ -24,6 +29,7 @@ class ProjectOut(BaseModel):
     status: str
     source_type: str | None
     source_url: str | None
+    source_text: str | None
     created_at: datetime
     updated_at: datetime
 

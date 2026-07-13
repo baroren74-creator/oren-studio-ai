@@ -46,7 +46,7 @@ Orchestrator code.
 
 | Agent | Folder | Responsibility | Emits (on success) |
 |---|---|---|---|
-| Research Agent | `agents/research_agent` | Finds sources, reads documentation, summarizes, understands the underlying technology, finds the *original* source. | `research.completed` |
+| Research Agent | `agents/research_agent` | Finds sources, reads documentation, summarizes, understands the underlying technology, finds the *original* source. `github`/`youtube` fetch automatically; `reel`/`post`/`tweet` read a manually-pasted `source_text` instead (Phase 3.9-out-of-sequence — see `docs/roadmap.md` for why automated Instagram fetching wasn't built). | `research.completed` |
 | Trend Agent | `agents/trend_agent` | Discovers new things: GitHub Trending (v1, done), Hacker News, Product Hunt, Reddit, AI news, Twitter/X (deferred), YouTube, blogs. Not a `workflows/graph.py` node — runs independent of any project (`ideas.project_id` is nullable), triggered separately, not per-project. | `trend.discovered`, feeds the Idea Backlog |
 | Knowledge Agent | `agents/knowledge_agent` | Chunks + embeds + indexes the Research Agent's raw digest/transcript text into Qdrant's `knowledge_docs` collection via `packages/memory` (Phase 2.8, done — see the section below). Semantic search (`GET /api/knowledge/search`) is a separate `apps/api` route, not this Agent (Phase 2.9, done). | `source.ingested` |
 | Script Agent | `agents/script_agent` | Writes Hook, Body, CTA, Caption, Title, Hashtags together (one structured LLM call, not three) — in Oren's style (`style_profile`, Phase 3.1/3.2-3.4, done — see the section below). | `script.drafted` |

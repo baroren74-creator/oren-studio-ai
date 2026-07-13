@@ -356,6 +356,11 @@ def test_research_node_passes_source_fields_to_real_agent(client, monkeypatch):
     assert received_inputs[0].payload == {
         "source_type": "github",
         "source_url": "https://github.com/octocat/Hello-World",
+        # Phase 3.9: always forwarded now (research_node's payload dict),
+        # even though this github-sourced project never sets it — see
+        # agents/research_agent/agent.py's manual-text branch for the
+        # only case it's actually read.
+        "source_text": None,
     }
 
 

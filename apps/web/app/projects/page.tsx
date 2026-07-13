@@ -12,6 +12,12 @@ import { api, type Project } from "@/lib/api";
 
 const SOURCE_TYPES = ["github", "youtube", "reel", "post", "tweet", "website"] as const;
 
+// Phase 3.9: no reliable, ToS-clean automated fetch exists for these
+// source types (see agents/research_agent/agent.py's module docstring —
+// Meta disabled most public Instagram Reel scraping/download endpoints
+// in late 2024) — Oren pastes the caption/transcript himself instead.
+const MANUAL_TEXT_SOURCE_TYPES = new Set<(typeof SOURCE_TYPES)[number]>(["reel", "post", "tweet"]);
+
 export default function ProjectsPage() {
   const router = useRouter();
 
@@ -21,8 +27,11 @@ export default function ProjectsPage() {
 
   const [sourceUrl, setSourceUrl] = useState("");
   const [sourceType, setSourceType] = useState<(typeof SOURCE_TYPES)[number]>("github");
+  const [sourceText, setSourceText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isManualText = MANUAL_TEXT_SOURCE_TYPES.has(sourceType);
 
   useEffect(() => {
     api
@@ -37,7 +46,11 @@ export default function ProjectsPage() {
     setSubmitting(true);
     setError(null);
     try {
-      const project = await api.createProject({ source_type: sourceType, source_url: sourceUrl });
+      const project = await api.createProject({
+        source_type: sourceType,
+        source_url: sourceUrl,
+        source_text: isManualText ? sourceText : undefined,
+      });
       router.push(`/projects/${project.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "failed to create project");
@@ -72,7 +85,11 @@ export default function ProjectsPage() {
 
       <div className="card stack" style={{ maxWidth: 480 }}>
         <h2 style={{ margin: 0 }}>New project</h2>
-        <p style={{ margin: 0 }}>Paste a source URL to create a new project row.</p>
+        <p style={{ margin: 0 }}>
+          {isManualText
+            ? "No automated fetch exists for this source type yet — paste the link plus the caption/transcript text yourself."
+            : "Paste a source URL to create a new project row."}
+        </p>
         <form onSubmit={handleSubmit} className="stack">
           <select value={sourceType} onChange={(e) => setSourceType(e.target.value as typeof sourceType)}>
             {SOURCE_TYPES.map((t) => (
@@ -88,6 +105,15 @@ export default function ProjectsPage() {
             value={sourceUrl}
             onChange={(e) => setSourceUrl(e.target.value)}
           />
+          {isManualText && (
+            <textarea
+              required
+              rows={6}
+              placeholder="Paste the caption or transcript text here…"
+              value={sourceText}
+              onChange={(e) => setSourceText(e.target.value)}
+            />
+          )}
           <button type="submit" className="btn btn-primary" disabled={submitting} style={{ alignSelf: "flex-start" }}>
             {submitting ? "Creating…" : "Create project"}
           </button>

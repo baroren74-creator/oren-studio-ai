@@ -5,6 +5,26 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Research Agent: manual-text sources (Instagram Reels/posts/tweets)
+- Raised directly by Oren ("most of my work is on Instagram"). Investigated
+  automated Reel fetching first — Meta disabled most public Reel
+  scraping/download endpoints in late 2024, so yt-dlp/proxy-scraper
+  approaches are unreliable and sit in grey-area ToS territory. Not
+  built. Instead: `agents/research_agent/agent.py` gained
+  `MANUAL_TEXT_SOURCE_TYPES = ("reel", "post", "tweet")` — reads a
+  manually-pasted `payload.source_text` instead of fetching anything,
+  then runs it through the same summarize pipeline `github`/`youtube`
+  already use.
+- `apps/api/app/models.py`'s `Project` gained `source_text` (migration
+  `c8f2a1d4b6e7`); threaded through `workflows/graph.py`'s `StudioState`/
+  `research_node` and `apps/api/app/services/orchestrator.py`'s
+  `initial_state`, same as every other seeded field.
+- `apps/web/app/projects/page.tsx`: New Project form shows a paste
+  textarea when `reel`/`post`/`tweet` is selected.
+- Tests: 6 new cases in `agents/research_agent/tests/test_agent.py`, one
+  new orchestrator-level wiring regression test. Full suite: 180 tests
+  passing. `apps/web`: `tsc --noEmit` and `next build` clean.
+
 ### Added — Phase 3.8: real Storyboard view + apps/web design system
 - Requested by Oren directly ("think about design, do research"):
   `apps/web/app/globals.css` gained a real dark-first design system

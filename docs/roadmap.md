@@ -594,6 +594,44 @@ in case scheduled/automated posting is wanted later.
     `npm run build` both clean (`/projects/[id]/storyboard` shows up as
     a new dynamic route). A mockup of the redesigned Storyboard view was
     shown to Oren for approval before shipping — approved.
+3.8.5 Research Agent: manual-text source types (reel/post/tweet) —
+      out-of-sequence, raised directly by Oren ("most of my work is on
+      Instagram"). **Done.** Investigated automated Instagram Reel
+      fetching first — Meta disabled most public Reel scraping/download
+      endpoints in late 2024, so yt-dlp/proxy-scraper approaches are
+      unreliable and sit in grey-area territory around Instagram's
+      terms of service (confirmed via web search before writing any
+      code). Rejected building a "real Agent" on that footing — the
+      only reliable, ToS-clean paths are Instagram's official Graph API
+      (needs a connected Business/Creator account + app review,
+      deferred alongside the rest of Phase 0.5's publishing-API
+      applications) or manual paste, which is what shipped.
+
+      `agents/research_agent/agent.py`: `MANUAL_TEXT_SOURCE_TYPES =
+      ("reel", "post", "tweet")` — docs/database.md's schema already
+      listed these as free-text source types. When `source_type` is one
+      of these, the Agent reads `payload.source_text` directly (no
+      fetch at all) and runs it through the exact same
+      summarize-into-`raw_text`/`summary`/`key_points` pipeline
+      `github`/`youtube` already use — `source_url` is still accepted
+      as an optional reference link but never dereferenced.
+      `apps/api/app/models.py`'s `Project` gained `source_text`
+      (migration `c8f2a1d4b6e7`); `workflows/graph.py`'s `StudioState`
+      and `research_node`'s payload, and
+      `apps/api/app/services/orchestrator.py`'s `initial_state`, thread
+      it through the same way every other seeded field already does.
+      `apps/web`'s New Project form shows a paste textarea instead of
+      relying on `source_url` alone whenever `reel`/`post`/`tweet` is
+      selected.
+
+      Tests: 6 new cases in `agents/research_agent/tests/test_agent.py`
+      (happy path, post/tweet reuse the same branch, missing/blank
+      `source_text` fails cleanly, `source_url` genuinely optional, LLM
+      failure caught not raised), one new orchestrator-level regression
+      test (`source_text` actually reaches the real Agent's payload —
+      same bug class research_node/script_node's existing wiring tests
+      guard against). Full suite: 180 tests passing. `apps/web`:
+      `npx tsc --noEmit` and `npm run build` both clean.
 3.9 Approved scripts feed `personal_style` in Qdrant.
 3.10 End-to-end test: approved idea → script → storyboard shown for
      approval.

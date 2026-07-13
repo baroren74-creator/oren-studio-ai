@@ -15,8 +15,23 @@ is what the Knowledge Agent (agents/knowledge_agent) chunks, embeds, and
 indexes into Qdrant. See workflows/graph.py's research_node/knowledge_node
 for how it's threaded through StudioState.
 
-Remaining source types (articles, tweets) are not implemented yet and
-return status="skipped" rather than pretending to handle them.
+Phase 3.9: real logic for Instagram Reels — but NOT automated fetching.
+Investigated first (docs/roadmap.md's write-up has the full research):
+Meta disabled most public Reel scraping/download endpoints in late 2024,
+so yt-dlp/proxy-scraper approaches are unreliable and sit in grey-area
+territory around Instagram's terms of service — not something to build
+a "real Agent" on. The only options that are both reliable and
+ToS-clean are (a) Instagram's official Graph API, which requires a
+connected Business/Creator account and app review — deferred alongside
+the rest of Phase 0.5's publishing-API applications, same reasoning as
+ADR-011 — or (b) Oren pastes the caption/transcript himself, which is
+what this ships: `source_type in MANUAL_TEXT_SOURCE_TYPES` (reel/post/
+tweet — the free-text source types docs/database.md's schema already
+listed) reads `payload.source_text` directly instead of fetching
+anything, then runs it through the exact same summarize-and-index
+pipeline `github`/`youtube` already use. Most of Oren's own content is
+Instagram-first, so this was explicitly prioritized over polishing
+already-working parts of the pipeline.
 
 This replaces the Stub Agent registration from Phase 1.18 — note that
 NOTHING about how it's registered or called changed (core.registry,
@@ -44,9 +59,13 @@ from agents.research_agent.github_source import GitHubSourceError, fetch_repo_di
 from agents.research_agent.youtube_source import YouTubeSourceError, fetch_video_transcript
 
 NAME = "research_agent"
-VERSION = "0.4.0"  # bumped: result now includes raw_text for the Knowledge Agent (Phase 2.8)
+VERSION = "0.5.0"  # bumped: Phase 3.9 manual-text source types (reel/post/tweet)
 
-SUPPORTED_SOURCE_TYPES = ("github", "youtube")
+# reel/post/tweet: no reliable, ToS-clean automated fetch exists (see this
+# module's docstring) — Oren pastes the caption/transcript himself via
+# payload.source_text instead of a fetchable source_url.
+MANUAL_TEXT_SOURCE_TYPES = ("reel", "post", "tweet")
+SUPPORTED_SOURCE_TYPES = ("github", "youtube") + MANUAL_TEXT_SOURCE_TYPES
 
 GITHUB_SYSTEM_PROMPT = (
     "You are the Research Agent inside Oren Studio AI, a personal Hebrew "
@@ -70,6 +89,20 @@ YOUTUBE_SYSTEM_PROMPT = (
     "actual things said in the video, don't write generic filler. "
     "Respond in English regardless of the transcript's language; Script "
     "Agent handles Hebrew translation later (docs/agents.md)."
+)
+
+MANUAL_TEXT_SYSTEM_PROMPT = (
+    "You are the Research Agent inside Oren Studio AI, a personal Hebrew "
+    "tech-content studio. Given the caption or transcript text a person "
+    "pasted in from a social media post (Instagram Reel, post, or tweet — "
+    "expect informal writing, hashtags, emoji, possibly Hebrew), write: "
+    "(1) a 2-3 sentence summary of what the post is about and why it "
+    "might be interesting to react to or build on for a short tech "
+    "video, and (2) 3-5 short bullet key points (one per line, each "
+    "starting with '- '). Be concrete — name actual things said in the "
+    "text, don't write generic filler. Respond in English regardless of "
+    "the source text's language; Script Agent handles Hebrew translation "
+    "later (docs/agents.md)."
 )
 
 
@@ -136,6 +169,31 @@ class ResearchAgent:
                 status="skipped",
                 result={"reason": f"source_type '{source_type}' not implemented yet (supported: {SUPPORTED_SOURCE_TYPES})"},
                 next_event=None,
+            )
+
+        if source_type in MANUAL_TEXT_SOURCE_TYPES:
+            # No source_url fetch at all here — see this module's
+            # docstring for why (no reliable, ToS-clean automated fetch
+            # exists for Instagram as of this writing). source_url is
+            # still accepted and carried through as a reference link
+            # (e.g. "which Reel was this"), but it's optional and never
+            # dereferenced.
+            source_text = input.payload.get("source_text")
+            if not source_text or not source_text.strip():
+                return AgentOutput(status="failed", result={"reason": "payload.source_text is required for a manual-text source_type"})
+
+            return _summarize(
+                system_prompt=MANUAL_TEXT_SYSTEM_PROMPT,
+                prompt_text=source_text.strip(),
+                extra_result={
+                    "source_url": source_url,
+                    # Same reasoning as the GitHub/YouTube branches below —
+                    # this is what the Knowledge Agent chunks/embeds/indexes.
+                    # Here it's simply the pasted text verbatim, since
+                    # there's no separate "raw digest" vs "LLM summary"
+                    # distinction to make for manually-provided text.
+                    "raw_text": source_text.strip(),
+                },
             )
 
         if not source_url:

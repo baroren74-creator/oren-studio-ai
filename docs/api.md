@@ -7,7 +7,11 @@ type (see `CONTRIBUTING.md`).
 ## REST — core routes
 
 ```
-POST   /api/projects                     create a project from a source
+POST   /api/projects                     create a project from a source. Body: title, source_type,
+                                          source_url, source_text (optional — only read by the Research
+                                          Agent when source_type is reel|post|tweet, since there's no
+                                          reliable/ToS-clean automated fetch for those; see
+                                          agents/research_agent/agent.py's module docstring)
 GET    /api/projects                     list all, most recent first — done. apps/web's Projects page
                                           uses this (a real gap found live: previously no way back to
                                           a project you'd already created, only the New Project form)

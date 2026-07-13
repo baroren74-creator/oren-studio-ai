@@ -41,6 +41,12 @@ class StudioState(TypedDict, total=False):
     run_id: str
     source_type: str | None
     source_url: str | None
+    # Phase 3.9: only meaningful when source_type is a manual-text type
+    # (reel/post/tweet — agents/research_agent/agent.py's
+    # MANUAL_TEXT_SOURCE_TYPES) — the caption/transcript Oren pasted in
+    # himself, since there's no reliable/ToS-clean automated fetch for
+    # those source types. None for github/youtube.
+    source_text: str | None
     research_summary: str | None
     research_key_points: list[str] | None
     research_raw_text: str | None
@@ -165,7 +171,13 @@ def build_graph(registry: AgentRegistry | None = None):
         # research_agent/agent.py) — everything else is still a Stub
         # Agent that ignores payload, so still gets {} via _agent_event's
         # default.
-        payload = {"source_type": state.get("source_type"), "source_url": state.get("source_url")}
+        payload = {
+            "source_type": state.get("source_type"),
+            "source_url": state.get("source_url"),
+            # Phase 3.9: only read by ResearchAgent for manual-text
+            # source types (reel/post/tweet) — ignored otherwise.
+            "source_text": state.get("source_text"),
+        }
         out = _run_agent_sync(reg, "research_agent", state, payload=payload)
         update: dict[str, Any] = {
             "events": [out["next_event"]] if out["next_event"] else [],
