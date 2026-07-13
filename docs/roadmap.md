@@ -468,6 +468,14 @@ in case scheduled/automated posting is wanted later.
     creates a matching pending Approval (and that a rejected idea
     creates none). Full suite: 144 tests passing (`make test`).
     `apps/web`: `npx tsc --noEmit` and `npm run build` both clean.
+
+    Out-of-sequence fix, found live right after this shipped: 1.15's
+    "New Project" screen had no way back to a project already created —
+    `apps/web/app/projects/page.tsx` was only ever the creation form, no
+    list. Added `GET /api/projects` (most recent first) and a projects
+    list above the form, linking to each `/projects/{id}`. Tests:
+    `apps/api/tests/test_projects.py` (3 cases). Full suite: 147 tests
+    passing.
 3.7 Storyboard Agent: **custom LLM-prompting module** (structured JSON:
     scene, duration, visual instruction, caption cue) — no mature OSS
     library exists for this (see `docs/open-source-landscape.md` section

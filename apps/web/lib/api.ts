@@ -103,6 +103,7 @@ export type Prompt = {
 };
 
 export const api = {
+  listProjects: () => request<Project[]>("/api/projects"),
   createProject: (body: { title?: string; source_type: string; source_url: string }) =>
     request<Project>("/api/projects", { method: "POST", body: JSON.stringify(body) }),
   getProject: (id: string) => request<Project>(`/api/projects/${id}`),

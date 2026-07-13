@@ -8,6 +8,9 @@ type (see `CONTRIBUTING.md`).
 
 ```
 POST   /api/projects                     create a project from a source
+GET    /api/projects                     list all, most recent first — done. apps/web's Projects page
+                                          uses this (a real gap found live: previously no way back to
+                                          a project you'd already created, only the New Project form)
 GET    /api/projects/{id}
 GET    /api/projects/{id}/timeline       all agent_events, chronological
 POST   /api/projects/{id}/run            v0 synchronous graph run — done (Phase 3.4.5), see

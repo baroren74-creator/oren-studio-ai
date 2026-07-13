@@ -29,6 +29,14 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db)) -> Pro
     return project
 
 
+@router.get("", response_model=list[ProjectOut])
+def list_projects(db: Session = Depends(get_db)) -> list[Project]:
+    # Most-recently-created first — apps/web's Projects page uses this
+    # to show "what have I already started" (a real gap found live: the
+    # page only had a New Project form, no way back to an existing one).
+    return list(db.scalars(select(Project).order_by(Project.created_at.desc())))
+
+
 @router.get("/{project_id}", response_model=ProjectOut)
 def get_project(project_id: str, db: Session = Depends(get_db)) -> Project:
     project = db.get(Project, project_id)

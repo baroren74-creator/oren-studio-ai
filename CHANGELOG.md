@@ -5,6 +5,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed — apps/web's Projects page had no way back to an existing project
+- Found live: the page was only ever the "New Project" creation form.
+- `GET /api/projects`: list all projects, most recent first.
+- `apps/web/app/projects/page.tsx`: shows the list (linking to each
+  `/projects/{id}`) above the existing creation form.
+- Tests: `apps/api/tests/test_projects.py` (3 cases). Full suite: 147
+  tests passing.
+
 ### Added — Phase 3.6: Approval Gate #1 (review/approve/reject/request-edit a script)
 - `apps/api/app/services/approvals.py`: `create_approval` (always
   `pending`), `get_approval`, `list_approvals_for_project`,
