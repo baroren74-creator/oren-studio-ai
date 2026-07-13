@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.deps import get_db, require_api_key
 from app.models import AgentEvent, AgentRun, Project
-from app.schemas import AgentEventOut, ApprovalOut, ProjectCreate, ProjectOut, ProjectRunOut
+from app.schemas import AgentEventOut, ApprovalOut, ProjectCreate, ProjectOut, ProjectRunOut, StoryboardOut
 from app.services.approvals import list_approvals_for_project
 from app.services.orchestrator import ProjectNotFoundError, run_project
+from app.services.storyboard import get_latest_storyboard_for_project
 
 router = APIRouter(prefix="/api/projects", tags=["projects"], dependencies=[Depends(require_api_key)])
 
@@ -65,6 +66,22 @@ def get_project_approvals(project_id: str, db: Session = Depends(get_db)) -> lis
     if project is None:
         raise HTTPException(status_code=404, detail="project not found")
     return list_approvals_for_project(db, project_id)
+
+
+@router.get("/{project_id}/storyboard", response_model=StoryboardOut)
+def get_project_storyboard(project_id: str, db: Session = Depends(get_db)):
+    # Phase 3.8: the real Storyboard view needs to survive a page
+    # reload — ProjectRunOut.storyboard_scenes only lives as long as a
+    # POST .../run response does. See
+    # app.services.storyboard.get_latest_storyboard_for_project's
+    # docstring for how "latest" is resolved.
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="project not found")
+    storyboard = get_latest_storyboard_for_project(db, project_id)
+    if storyboard is None:
+        raise HTTPException(status_code=404, detail="no storyboard yet for this project")
+    return storyboard
 
 
 @router.post("/{project_id}/run", response_model=ProjectRunOut)

@@ -109,6 +109,20 @@ class StoryboardSceneOut(BaseModel):
     visual_ref: str | None
 
 
+class StoryboardOut(BaseModel):
+    """`GET /api/projects/{id}/storyboard` — Phase 3.8's Storyboard view
+    needs this to survive a page reload; `ProjectRunOut.storyboard_scenes`
+    alone only lives as long as the run response does. See
+    app.services.storyboard's `get_latest_storyboard_for_project()`."""
+
+    id: str
+    script_id: str
+    scenes: list[StoryboardSceneOut]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
 class ProjectRunOut(BaseModel):
     """Response for `POST /api/projects/{id}/run` — see
     app.services.orchestrator's module docstring for what this endpoint

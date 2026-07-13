@@ -35,6 +35,13 @@ POST   /api/projects/{id}/run            v0 synchronous graph run — done (Phas
                                           what powers GET /api/agent-runs and apps/web's Ops page total.
 GET    /api/projects/{id}/approvals      all approvals for a project, still-pending ones first — done
                                           (Phase 3.6)
+GET    /api/projects/{id}/storyboard     the project's latest Storyboard (via its latest Script) — done
+                                          (Phase 3.8). 404 if no script has ever successfully produced a
+                                          storyboard. Exists because ProjectRunOut.storyboard_scenes only
+                                          lives as long as one POST .../run response — apps/web's
+                                          Storyboard view (/projects/{id}/storyboard) needs this to
+                                          survive a page reload. See
+                                          app.services.storyboard.get_latest_storyboard_for_project.
 
 POST   /api/agents/{agent_name}/run      manual/debug run of a single agent
 GET    /api/agent-runs/{id}

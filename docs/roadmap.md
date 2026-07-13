@@ -549,7 +549,51 @@ in case scheduled/automated posting is wanted later.
     call in the suite). Full suite: 166 tests passing. `apps/web`:
     `npx tsc --noEmit` and `npm run build` both clean. Alembic migration
     verified against a throwaway SQLite DB (`alembic upgrade head`).
-3.8 UI: Storyboard view (scene list + preview).
+3.8 UI: Storyboard view (scene list + preview). **Done**, alongside a
+    design pass Oren explicitly asked for ("think about design, do
+    research") — this is also where `apps/web` got its first real
+    design system instead of ad hoc inline styles on unstyled browser
+    defaults.
+
+    Design system (`apps/web/app/globals.css`, module comment has the
+    research citations): dark-first (not a light/dark toggle — a
+    personal single-user tool doesn't need to please every OS
+    preference), one accent color (amber, `--accent`), a small semantic
+    token scale (surfaces/borders/text/spacing/radius/type), and
+    reusable primitives (`.card`, `.btn`/`.btn-primary`/`.btn-danger`,
+    `.badge` variants, `.stat`, `.empty-state`) instead of one-off
+    inline styles per page. `components/Nav.tsx` split out of
+    `app/layout.tsx` (still a Server Component, so `metadata` still
+    works) specifically so the active nav link can be highlighted via
+    `usePathname()`. Applied across Projects, Project detail, Ops, and
+    Prompts; Ops's total-cost stat is now the single most-prominent
+    number on the page (research: "surface the one metric that answers
+    'is everything okay?' first").
+
+    Storyboard view itself: `/projects/[id]/storyboard`
+    (`apps/web/app/projects/[id]/storyboard/page.tsx`) — a card grid,
+    one card per scene (order badge, duration badge, the visual
+    instruction as the card's main content since there's no real
+    thumbnail yet, caption cue below). Reads
+    `GET /api/projects/{id}/storyboard` rather than the ephemeral
+    `ProjectRunOut.storyboard_scenes` the project page's "Latest run"
+    card already had — that response only lives as long as one
+    `POST .../run` call does, so it can't survive a page reload.
+    `apps/api/app/services/storyboard.py`'s
+    `get_latest_storyboard_for_project()` walks project → latest Script
+    → latest Storyboard (route in `app/routers/projects.py`, schema
+    `StoryboardOut`). The project page's inline scene list — always
+    documented as a stopgap for exactly this phase — is now a compact
+    "N scenes → View full storyboard" link instead.
+
+    Tests: `apps/api/tests/test_storyboard_persistence.py` gained
+    `get_latest_storyboard_for_project` coverage (3 cases), new
+    `apps/api/tests/test_storyboard_route.py` (4 cases: 200 with scenes,
+    404 with no storyboard, 404 missing project, 401 no API key). Full
+    suite: 173 tests passing. `apps/web`: `npx tsc --noEmit` and
+    `npm run build` both clean (`/projects/[id]/storyboard` shows up as
+    a new dynamic route). A mockup of the redesigned Storyboard view was
+    shown to Oren for approval before shipping — approved.
 3.9 Approved scripts feed `personal_style` in Qdrant.
 3.10 End-to-end test: approved idea → script → storyboard shown for
      approval.

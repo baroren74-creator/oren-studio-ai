@@ -123,46 +123,52 @@ export default function PromptsPage() {
   return (
     <div>
       <h1>Prompt Library</h1>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
 
-      <div style={{ display: "flex", gap: "2rem", alignItems: "flex-start" }}>
-        <div style={{ minWidth: 280 }}>
+      <div style={{ display: "flex", gap: "var(--space-6)", alignItems: "flex-start" }}>
+        <div style={{ minWidth: 280 }} className="stack">
           <h2>Prompts</h2>
           {prompts.length === 0 ? (
-            <p>No prompts yet — create one below.</p>
+            <div className="empty-state">No prompts yet — create one below.</div>
           ) : (
-            <ul style={{ listStyle: "none", padding: 0 }}>
+            <div className="stack" style={{ gap: "var(--space-1)" }}>
               {prompts.map((p) => (
-                <li key={p.id} style={{ marginBottom: "0.5rem" }}>
-                  <button
-                    type="button"
-                    onClick={() => selectPrompt(p)}
-                    style={{ fontWeight: p.id === selectedId ? "bold" : "normal" }}
-                  >
-                    {p.name} (v{p.version}){p.category ? ` — ${p.category}` : ""}
-                  </button>
-                </li>
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => selectPrompt(p)}
+                  className="btn"
+                  style={{
+                    justifyContent: "flex-start",
+                    background: p.id === selectedId ? "var(--bg-raised-2)" : "transparent",
+                    borderColor: p.id === selectedId ? "var(--accent)" : "var(--border-strong)",
+                  }}
+                >
+                  {p.name} (v{p.version}){p.category ? ` — ${p.category}` : ""}
+                </button>
               ))}
-            </ul>
+            </div>
           )}
 
-          <h3>New prompt</h3>
-          <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 320 }}>
-            <input placeholder="name" required value={newName} onChange={(e) => setNewName(e.target.value)} />
-            <input placeholder="category (optional)" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} />
-            <textarea placeholder="prompt text" rows={4} value={newText} onChange={(e) => setNewText(e.target.value)} />
-            <button type="submit" disabled={creating}>
-              {creating ? "Creating…" : "Create prompt"}
-            </button>
-          </form>
+          <div className="card stack">
+            <h3 style={{ margin: 0 }}>New prompt</h3>
+            <form onSubmit={handleCreate} className="stack">
+              <input placeholder="name" required value={newName} onChange={(e) => setNewName(e.target.value)} />
+              <input placeholder="category (optional)" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} />
+              <textarea placeholder="prompt text" rows={4} value={newText} onChange={(e) => setNewText(e.target.value)} />
+              <button type="submit" className="btn btn-primary" disabled={creating} style={{ alignSelf: "flex-start" }}>
+                {creating ? "Creating…" : "Create prompt"}
+              </button>
+            </form>
+          </div>
         </div>
 
         {selected && (
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <h2>
+          <div style={{ flex: 1, minWidth: 0 }} className="stack">
+            <h2 style={{ margin: 0 }}>
               {selected.name} — version {selected.version}
             </h2>
-            <p>Category: {selected.category ?? "—"}</p>
+            <p style={{ margin: 0 }}>Category: {selected.category ?? "—"}</p>
 
             <textarea
               rows={8}
@@ -172,26 +178,31 @@ export default function PromptsPage() {
             />
 
             {draftText !== (selected.prompt_text ?? "") && (
-              <div style={{ marginTop: "0.75rem", maxWidth: 640 }}>
+              <div style={{ maxWidth: 640 }}>
                 <p>Unsaved changes — diff against version {selected.version}:</p>
                 <DiffView before={selected.prompt_text ?? ""} after={draftText} />
               </div>
             )}
 
-            <div style={{ marginTop: "0.75rem", display: "flex", gap: "0.5rem" }}>
-              <button type="button" onClick={handleSaveVersion} disabled={saving || draftText === (selected.prompt_text ?? "")}>
+            <div className="row">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleSaveVersion}
+                disabled={saving || draftText === (selected.prompt_text ?? "")}
+              >
                 {saving ? "Saving…" : "Save as new version"}
               </button>
-              <button type="button" onClick={handleDelete}>
+              <button type="button" className="btn btn-danger" onClick={handleDelete}>
                 Delete prompt (all versions)
               </button>
             </div>
 
-            <h3 style={{ marginTop: "1.5rem" }}>History</h3>
+            <h3 style={{ marginTop: "var(--space-4)" }}>History</h3>
             {history.length <= 1 ? (
               <p>Only one version so far.</p>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "1rem", maxWidth: 640 }}>
+              <div className="stack" style={{ gap: "var(--space-4)", maxWidth: 640 }}>
                 {history.slice(1).map((version, i) => (
                   <div key={version.id}>
                     <p>

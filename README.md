@@ -18,9 +18,11 @@ This is **not** a SaaS product. It is being built for one user. See
 end-to-end (with a matching "Run" button in `apps/web`), a
 CRUD + versioning Prompt Library (with a diff view between versions),
 Approval Gate #1 (review/approve/reject/request-edit a drafted script),
-and the Storyboard module (a drafted script turned into an ordered scene
-breakdown) are done. Next up: the real Storyboard UI (scene list +
-preview) — see `docs/roadmap.md` for the exact state of every item.
+the Storyboard module (a drafted script turned into an ordered scene
+breakdown), and a real Storyboard view with a proper design system for
+`apps/web` (dark-first, one accent color, reusable card/button/badge
+primitives) are done. See `docs/roadmap.md` for the exact state of
+every item.
 
 ## Repository layout
 

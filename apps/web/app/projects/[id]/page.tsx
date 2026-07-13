@@ -6,15 +6,19 @@
 // apps/api/app/services/orchestrator.py's module docstring for what
 // that endpoint does (a synchronous v0 graph run, not the eventual
 // services/orchestrator-worker). The resulting script is rendered
-// below the timeline once a run completes; before Phase 3.7's real
-// Storyboard UI exists, this is the fastest way to see actual pipeline
-// output rather than just a raw event list.
+// below the timeline once a run completes.
 //
 // Phase 3.6, Approval Gate #1: a drafted script always comes with a
 // pending Approval row (apps/api/app/services/orchestrator.py). This
 // page shows it and lets Oren approve / reject / request an edit — see
 // apps/api/app/services/approvals.py's module docstring for why this
 // is a standalone review step rather than resuming a paused graph run.
+//
+// Phase 3.8: the "Latest run" card only shows a compact storyboard
+// summary + a link to the real Storyboard view
+// (/projects/[id]/storyboard) — the full scene-by-scene inline list
+// that used to live here was always documented as a stopgap for exactly
+// this phase, see that page's module comment.
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -110,106 +114,100 @@ export default function ProjectTimelinePage() {
     }
   }
 
-  if (error) return <p style={{ color: "crimson" }}>{error}</p>;
+  if (error) return <p style={{ color: "var(--danger)" }}>{error}</p>;
   if (!project) return <p>Loading…</p>;
 
   const pendingApproval = approvals.find((a) => a.status === "pending") ?? null;
   const decidedApprovals = approvals.filter((a) => a.status !== "pending");
 
   return (
-    <div>
-      <h1>{project.title ?? "(untitled project)"}</h1>
-      <p>
-        Status: <strong>{project.status}</strong> · Source: {project.source_type} — {project.source_url}
-      </p>
+    <div className="stack" style={{ gap: "var(--space-6)" }}>
+      <div>
+        <h1>{project.title ?? "(untitled project)"}</h1>
+        <p style={{ margin: 0 }}>
+          <span className="badge badge-neutral">{project.status}</span>{" "}
+          <span style={{ color: "var(--text-faint)" }}>
+            {project.source_type} — {project.source_url}
+          </span>
+        </p>
+      </div>
 
-      <div style={{ margin: "1rem 0" }}>
-        <button type="button" onClick={handleRun} disabled={running}>
+      <div>
+        <button type="button" className="btn btn-primary" onClick={handleRun} disabled={running}>
           {running ? "Running…" : "Run"}
         </button>
-        {runError && <p style={{ color: "crimson" }}>{runError}</p>}
+        {runError && <p style={{ color: "var(--danger)", marginTop: "var(--space-2)" }}>{runError}</p>}
       </div>
 
       {lastRun && (
-        <div style={{ border: "1px solid #ccc", borderRadius: 6, padding: "1rem", marginBottom: "1.5rem" }}>
-          <h2>Latest run</h2>
-          <p>
-            Idea score: <strong>{lastRun.idea_score ?? "n/a"}</strong>
-            {lastRun.rejected && <span style={{ color: "crimson" }}> — rejected, below threshold</span>}
-          </p>
-          <p>
-            Cost of this run: <strong>${lastRun.total_cost_usd.toFixed(6)}</strong> — see the{" "}
-            <a href="/ops">Ops page</a> for the running total across every run.
-          </p>
+        <div className="card stack">
+          <h2 style={{ margin: 0 }}>Latest run</h2>
+          <div className="row" style={{ gap: "var(--space-5)" }}>
+            <div className="stat">
+              <span className="stat-value">{lastRun.idea_score ?? "n/a"}</span>
+              <span className="stat-label">Idea score</span>
+            </div>
+            <div className="stat">
+              <span className="stat-value">${lastRun.total_cost_usd.toFixed(6)}</span>
+              <span className="stat-label">
+                Cost — <a href="/ops">running total</a>
+              </span>
+            </div>
+          </div>
+          {lastRun.rejected && <span className="badge badge-danger">Rejected — below threshold</span>}
 
           {lastRun.script ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 640 }}>
+            <div className="stack" style={{ maxWidth: 640 }}>
               <p>
-                <strong>Title:</strong> {lastRun.script.title ?? "—"}
+                <strong style={{ color: "var(--text)" }}>Title:</strong> {lastRun.script.title ?? "—"}
               </p>
               <p>
-                <strong>Hook:</strong> {lastRun.script.hook ?? "—"}
+                <strong style={{ color: "var(--text)" }}>Hook:</strong> {lastRun.script.hook ?? "—"}
               </p>
               <p>
-                <strong>Body:</strong> {lastRun.script.body ?? "—"}
+                <strong style={{ color: "var(--text)" }}>Body:</strong> {lastRun.script.body ?? "—"}
               </p>
               <p>
-                <strong>CTA:</strong> {lastRun.script.cta ?? "—"}
+                <strong style={{ color: "var(--text)" }}>CTA:</strong> {lastRun.script.cta ?? "—"}
               </p>
               <p>
-                <strong>Caption:</strong> {lastRun.script.caption ?? "—"}
+                <strong style={{ color: "var(--text)" }}>Caption:</strong> {lastRun.script.caption ?? "—"}
               </p>
               <p>
-                <strong>Hashtags:</strong> {lastRun.script.hashtags?.join(" ") ?? "—"}
+                <strong style={{ color: "var(--text)" }}>Hashtags:</strong> {lastRun.script.hashtags?.join(" ") ?? "—"}
               </p>
             </div>
           ) : (
-            <p>No script produced for this run (idea rejected, or no ANTHROPIC_API_KEY/VOYAGE_API_KEY configured — see Makefile's run-api target).</p>
+            <p>No script produced for this run (idea rejected, or no ANTHROPIC_API_KEY/VOYAGE_API_KEY configured — see Makefile&apos;s run-api target).</p>
           )}
 
           {lastRun.storyboard_scenes && lastRun.storyboard_scenes.length > 0 && (
-            <div style={{ marginTop: "1rem" }}>
-              <h3>Storyboard</h3>
-              <p style={{ fontSize: "0.85rem", color: "#666" }}>
-                Scene breakdown — not the real Storyboard view yet (that&apos;s a later phase), just a stopgap so
-                there&apos;s something to see.
-              </p>
-              <ol style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 640 }}>
-                {lastRun.storyboard_scenes.map((scene) => (
-                  <li key={scene.order} style={{ border: "1px solid #eee", borderRadius: 4, padding: "0.5rem" }}>
-                    <p>
-                      <strong>Scene {scene.order}</strong> — {scene.duration}s
-                    </p>
-                    <p>{scene.description}</p>
-                    {scene.caption_cue && (
-                      <p style={{ fontStyle: "italic" }}>Caption: {scene.caption_cue}</p>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            </div>
+            <p style={{ margin: 0 }}>
+              <span className="badge badge-warning">{lastRun.storyboard_scenes.length} scenes</span>{" "}
+              <a href={`/projects/${params.id}/storyboard`}>View full storyboard →</a>
+            </p>
           )}
         </div>
       )}
 
       {pendingApproval && (
-        <div style={{ border: "2px solid #d9a441", borderRadius: 6, padding: "1rem", marginBottom: "1.5rem" }}>
-          <h2>Approval needed — {pendingApproval.stage}</h2>
+        <div className="card stack" style={{ borderColor: "var(--warning)" }}>
+          <h2 style={{ margin: 0 }}>Approval needed — {pendingApproval.stage}</h2>
           <p>The drafted script is waiting for a decision before this project moves on.</p>
-          {decideError && <p style={{ color: "crimson" }}>{decideError}</p>}
-          <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-            <button type="button" onClick={() => handleApprove(pendingApproval)} disabled={deciding}>
+          {decideError && <p style={{ color: "var(--danger)" }}>{decideError}</p>}
+          <div className="row">
+            <button type="button" className="btn btn-primary" onClick={() => handleApprove(pendingApproval)} disabled={deciding}>
               Approve
             </button>
-            <button type="button" onClick={() => handleReject(pendingApproval)} disabled={deciding}>
+            <button type="button" className="btn btn-danger" onClick={() => handleReject(pendingApproval)} disabled={deciding}>
               Reject
             </button>
-            <button type="button" onClick={() => setShowEditForm((v) => !v)} disabled={deciding}>
+            <button type="button" className="btn" onClick={() => setShowEditForm((v) => !v)} disabled={deciding}>
               Request edit
             </button>
           </div>
           {showEditForm && (
-            <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 480 }}>
+            <div className="stack" style={{ maxWidth: 480 }}>
               <textarea
                 placeholder="What should change?"
                 rows={3}
@@ -218,8 +216,10 @@ export default function ProjectTimelinePage() {
               />
               <button
                 type="button"
+                className="btn btn-primary"
                 onClick={() => handleRequestEdit(pendingApproval)}
                 disabled={deciding || editNotes.trim() === ""}
+                style={{ alignSelf: "flex-start" }}
               >
                 Send edit request
               </button>
@@ -229,12 +229,12 @@ export default function ProjectTimelinePage() {
       )}
 
       {decidedApprovals.length > 0 && (
-        <div style={{ marginBottom: "1.5rem" }}>
+        <div>
           <h3>Approval history</h3>
-          <ul>
+          <ul style={{ margin: 0, paddingLeft: "1.25rem", color: "var(--text-muted)" }}>
             {decidedApprovals.map((a) => (
               <li key={a.id}>
-                {a.stage}: <strong>{a.status}</strong>
+                {a.stage}: <strong style={{ color: "var(--text)" }}>{a.status}</strong>
                 {a.notes ? ` — "${a.notes}"` : ""}
                 {a.decided_at ? ` (${new Date(a.decided_at).toLocaleString()})` : ""}
               </li>
@@ -243,27 +243,29 @@ export default function ProjectTimelinePage() {
         </div>
       )}
 
-      <h2>Timeline</h2>
-      {events.length === 0 ? (
-        <p>No agent_events yet — run the pipeline above to generate some.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Time</th>
-              <th>Event</th>
-            </tr>
-          </thead>
-          <tbody>
-            {events.map((e) => (
-              <tr key={e.id}>
-                <td>{new Date(e.created_at).toLocaleString()}</td>
-                <td>{e.event_type}</td>
+      <div>
+        <h2>Timeline</h2>
+        {events.length === 0 ? (
+          <div className="empty-state">No agent_events yet — run the pipeline above to generate some.</div>
+        ) : (
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Event</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody>
+              {events.map((e) => (
+                <tr key={e.id}>
+                  <td>{new Date(e.created_at).toLocaleString()}</td>
+                  <td>{e.event_type}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

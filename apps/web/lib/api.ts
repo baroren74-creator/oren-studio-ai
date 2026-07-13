@@ -91,6 +91,17 @@ export type ProjectRun = {
   storyboard_scenes: StoryboardScene[] | null;
 };
 
+// GET /api/projects/{id}/storyboard — Phase 3.8. Unlike
+// ProjectRun.storyboard_scenes (which only lives as long as one run
+// response), this survives a page reload — see
+// app.services.storyboard.get_latest_storyboard_for_project.
+export type Storyboard = {
+  id: string;
+  script_id: string;
+  scenes: StoryboardScene[];
+  created_at: string;
+};
+
 // Phase 3.6, Approval Gate #1 — see
 // apps/api/app/services/approvals.py's module docstring for why this is
 // a standalone DB-backed gate rather than resuming a paused graph run.
@@ -124,6 +135,7 @@ export const api = {
   getProjectTimeline: (id: string) => request<AgentEvent[]>(`/api/projects/${id}/timeline`),
   listAgentRuns: () => request<AgentRun[]>("/api/agent-runs"),
   runProject: (id: string) => request<ProjectRun>(`/api/projects/${id}/run`, { method: "POST" }),
+  getStoryboard: (projectId: string) => request<Storyboard>(`/api/projects/${projectId}/storyboard`),
 
   listPrompts: () => request<Prompt[]>("/api/prompt-library"),
   createPrompt: (body: { name: string; category?: string; prompt_text?: string }) =>

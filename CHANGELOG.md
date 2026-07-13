@@ -5,6 +5,29 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Phase 3.8: real Storyboard view + apps/web design system
+- Requested by Oren directly ("think about design, do research"):
+  `apps/web/app/globals.css` gained a real dark-first design system
+  (one accent color, semantic tokens, reusable `.card`/`.btn`/`.badge`/
+  `.stat`/`.empty-state` primitives) replacing ad hoc inline styles on
+  unstyled browser defaults. Applied across Projects, Project detail,
+  Ops, and Prompts. `components/Nav.tsx` split out of `app/layout.tsx`
+  for an active-link-highlighted sidebar.
+- `GET /api/projects/{id}/storyboard`: the project's latest Storyboard,
+  via its latest Script (`app.services.storyboard.
+  get_latest_storyboard_for_project()`) — survives a page reload,
+  unlike `ProjectRunOut.storyboard_scenes`.
+- `apps/web/app/projects/[id]/storyboard/page.tsx`: the real Storyboard
+  view — a card grid, one card per scene. The project page's inline
+  scene list (always a documented stopgap) is now a compact link to
+  this page.
+- A visual mockup of the new design was shown to Oren for approval
+  before shipping.
+- Tests: `apps/api/tests/test_storyboard_persistence.py` gained
+  `get_latest_storyboard_for_project` coverage, new
+  `apps/api/tests/test_storyboard_route.py` (4 cases). Full suite: 173
+  tests passing. `apps/web`: `tsc --noEmit` and `next build` clean.
+
 ### Added — Phase 3.7: Storyboard module (script → scene breakdown)
 - `workflows/storyboard.py`: `generate_storyboard()` — a custom
   LLM-prompting module (not a registered Agent, same shape as

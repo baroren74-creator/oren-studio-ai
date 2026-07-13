@@ -47,50 +47,53 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div>
+    <div className="stack" style={{ gap: "var(--space-6)" }}>
       <h1>Projects</h1>
 
       {loadingProjects ? (
         <p>Loading…</p>
       ) : listError ? (
-        <p style={{ color: "crimson" }}>{listError}</p>
+        <p style={{ color: "var(--danger)" }}>{listError}</p>
       ) : projects.length === 0 ? (
-        <p>No projects yet — create one below.</p>
+        <div className="empty-state">No projects yet — create one below.</div>
       ) : (
-        <ul style={{ listStyle: "none", padding: 0, marginBottom: "2rem" }}>
+        <div className="stack" style={{ gap: "var(--space-2)" }}>
           {projects.map((p) => (
-            <li key={p.id} style={{ marginBottom: "0.5rem" }}>
-              <Link href={`/projects/${p.id}`}>
-                {p.title ?? "(untitled project)"} — <span style={{ opacity: 0.7 }}>{p.status}</span>
-                {p.source_type ? ` · ${p.source_type}` : ""}
-              </Link>
-            </li>
+            <Link key={p.id} href={`/projects/${p.id}`} className="card row" style={{ justifyContent: "space-between", textDecoration: "none" }}>
+              <span style={{ color: "var(--text)", fontWeight: 500 }}>{p.title ?? "(untitled project)"}</span>
+              <span className="row" style={{ gap: "var(--space-2)" }}>
+                {p.source_type && <span className="badge badge-neutral">{p.source_type}</span>}
+                <span className="badge badge-neutral">{p.status}</span>
+              </span>
+            </Link>
           ))}
-        </ul>
+        </div>
       )}
 
-      <h2>New project</h2>
-      <p>Paste a source URL to create a new project row.</p>
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 480 }}>
-        <select value={sourceType} onChange={(e) => setSourceType(e.target.value as typeof sourceType)}>
-          {SOURCE_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <input
-          type="url"
-          required
-          placeholder="https://github.com/..."
-          value={sourceUrl}
-          onChange={(e) => setSourceUrl(e.target.value)}
-        />
-        <button type="submit" disabled={submitting}>
-          {submitting ? "Creating…" : "Create project"}
-        </button>
-        {error && <p style={{ color: "crimson" }}>{error}</p>}
-      </form>
+      <div className="card stack" style={{ maxWidth: 480 }}>
+        <h2 style={{ margin: 0 }}>New project</h2>
+        <p style={{ margin: 0 }}>Paste a source URL to create a new project row.</p>
+        <form onSubmit={handleSubmit} className="stack">
+          <select value={sourceType} onChange={(e) => setSourceType(e.target.value as typeof sourceType)}>
+            {SOURCE_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+          <input
+            type="url"
+            required
+            placeholder="https://github.com/..."
+            value={sourceUrl}
+            onChange={(e) => setSourceUrl(e.target.value)}
+          />
+          <button type="submit" className="btn btn-primary" disabled={submitting} style={{ alignSelf: "flex-start" }}>
+            {submitting ? "Creating…" : "Create project"}
+          </button>
+          {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
+        </form>
+      </div>
     </div>
   );
 }

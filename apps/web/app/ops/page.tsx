@@ -23,6 +23,13 @@ function formatCost(usd: number | null): string {
   return `$${usd.toFixed(6)}`;
 }
 
+function statusBadgeClass(status: string): string {
+  if (status === "success") return "badge badge-success";
+  if (status === "failed") return "badge badge-danger";
+  if (status === "skipped") return "badge badge-neutral";
+  return "badge badge-warning"; // running / needs_approval
+}
+
 export default function OpsPage() {
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -35,19 +42,32 @@ export default function OpsPage() {
   const totalTokens = runs.reduce((sum, r) => sum + (r.tokens_used ?? 0), 0);
 
   return (
-    <div>
+    <div className="stack" style={{ gap: "var(--space-6)" }}>
       <h1>Ops — agent runs</h1>
-      {error && <p style={{ color: "crimson" }}>{error}</p>}
+      {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
 
       {runs.length > 0 && (
-        <p style={{ fontSize: "1.1rem" }}>
-          Total spent so far: <strong>{formatCost(totalCostUsd)}</strong> across {runs.length} agent run
-          {runs.length === 1 ? "" : "s"} ({totalTokens.toLocaleString()} tokens).
-        </p>
+        // Single-metric-first: "how much has this cost me so far" is
+        // the one number that answers "is everything okay?" for a
+        // single-user tool with real billing behind it.
+        <div className="row" style={{ gap: "var(--space-6)" }}>
+          <div className="stat">
+            <span className="stat-value">{formatCost(totalCostUsd)}</span>
+            <span className="stat-label">Total spent so far</span>
+          </div>
+          <div className="stat">
+            <span className="stat-value">{runs.length}</span>
+            <span className="stat-label">Agent runs</span>
+          </div>
+          <div className="stat">
+            <span className="stat-value">{totalTokens.toLocaleString()}</span>
+            <span className="stat-label">Tokens</span>
+          </div>
+        </div>
       )}
 
       {runs.length === 0 ? (
-        <p>No agent runs yet.</p>
+        <div className="empty-state">No agent runs yet.</div>
       ) : (
         <table>
           <thead>
@@ -63,7 +83,9 @@ export default function OpsPage() {
             {runs.map((r) => (
               <tr key={r.id}>
                 <td>{r.agent_name}</td>
-                <td>{r.status}</td>
+                <td>
+                  <span className={statusBadgeClass(r.status)}>{r.status}</span>
+                </td>
                 <td>{formatCost(r.cost_usd)}</td>
                 <td>{r.tokens_used ?? "—"}</td>
                 <td>{new Date(r.started_at).toLocaleString()}</td>
