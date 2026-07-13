@@ -22,8 +22,14 @@ POST   /api/projects/{id}/run            v0 synchronous graph run — done (Phas
                                           and, if the idea passed scoring, a Script. Returns
                                           ProjectRunOut: run_id, events, rejected, interrupted,
                                           idea_score, research_note_id, script_id, script, approval_id,
-                                          total_cost_usd. A successfully persisted Script always creates
-                                          a pending Approval(stage="script") alongside it — see below.
+                                          total_cost_usd, storyboard_id, storyboard_scenes. A successfully
+                                          persisted Script always creates a pending Approval(stage="script")
+                                          alongside it — see below. A successfully persisted Script also
+                                          gets a Storyboard row (workflows/storyboard.py's
+                                          generate_storyboard(), not a registered Agent — see that module's
+                                          docstring) linked by script_id; storyboard_scenes is null when
+                                          there was no script, or the Storyboard LLM call failed/produced
+                                          nothing usable.
                                           Also persists a real agent_runs row per Agent/scoring call made
                                           during the run (apps/api/app/services/agent_runs.py) — this is
                                           what powers GET /api/agent-runs and apps/web's Ops page total.

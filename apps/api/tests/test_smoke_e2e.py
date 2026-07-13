@@ -68,6 +68,7 @@ from langgraph.types import Command
 
 from workflows.graph import build_graph
 from workflows.idea_scoring import IdeaScore
+from workflows.storyboard import StoryboardResult
 
 
 def _mock_passing_score(monkeypatch, total: float = 100.0) -> None:
@@ -463,6 +464,18 @@ def test_script_node_passes_research_and_style_fields_to_real_agent(client, monk
         )
 
     monkeypatch.setattr("agents.script_agent.agent.ScriptAgent.run", _fake_script_run)
+    # This test's script succeeds (real hook/body), so storyboard_node
+    # would otherwise reach the real (unmocked) generate_storyboard() and
+    # attempt a real LLM call — same reasoning as _mock_passing_score for
+    # idea_scoring_node above; this test is about script_node's wiring,
+    # not the Storyboard module itself (see workflows/tests/
+    # test_storyboard.py for that).
+    monkeypatch.setattr(
+        "workflows.graph.generate_storyboard",
+        lambda **kwargs: StoryboardResult(
+            scenes=[{"order": 1, "description": "d", "duration": 1.0, "caption_cue": None, "visual_ref": None}]
+        ),
+    )
 
     registry = _all_stub_registry(exclude=frozenset({"research_agent", "script_agent"}))
     registry.register("research_agent", lambda: agents.research_agent.agent.agent)

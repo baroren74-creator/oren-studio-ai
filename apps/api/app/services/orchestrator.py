@@ -41,6 +41,7 @@ from app.services.agent_runs import persist_agent_runs
 from app.services.approvals import create_approval
 from app.services.research import persist_research_note, update_idea_score
 from app.services.script import persist_script
+from app.services.storyboard import persist_storyboard
 from app.services.style_profile import get_current_style_profile
 
 
@@ -149,6 +150,19 @@ def run_project(db: Session, project_id: str, *, registry: AgentRegistry | None 
             approval = create_approval(db, project_id=project.id, stage="script")
             approval_id = approval.id
 
+    # Phase 3.7: storyboard_node (workflows/graph.py) already skips
+    # itself when there's no script_hook/script_body to work from
+    # (rejected idea, or its own StoryboardError) — persist_storyboard
+    # mirrors that same "nothing to keep" no-op for an empty scenes list,
+    # so this call is safe even when script is None or storyboard_scenes
+    # is empty.
+    storyboard_id = None
+    storyboard_scenes = final_state.get("storyboard_scenes")
+    if script_id is not None:
+        storyboard = persist_storyboard(db, script_id=script_id, scenes=storyboard_scenes)
+        if storyboard is not None:
+            storyboard_id = storyboard.id
+
     # Cost tracking (found live to be a real gap: every real Agent
     # already computes its own cost, but nothing previously persisted
     # it — see app.services.agent_runs's module docstring).
@@ -170,4 +184,6 @@ def run_project(db: Session, project_id: str, *, registry: AgentRegistry | None 
         "script": script_result,
         "approval_id": approval_id,
         "total_cost_usd": total_cost_usd,
+        "storyboard_id": storyboard_id,
+        "storyboard_scenes": storyboard_scenes,
     }

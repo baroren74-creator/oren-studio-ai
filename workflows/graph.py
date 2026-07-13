@@ -29,6 +29,7 @@ from langgraph.types import interrupt
 from core.registry import AgentRegistry, default_registry
 from core.schemas.agent import AgentContext, AgentInput
 from workflows.idea_scoring import IdeaScoringError, score_idea
+from workflows.storyboard import StoryboardError, generate_storyboard
 
 
 class StudioState(TypedDict, total=False):
@@ -62,13 +63,18 @@ class StudioState(TypedDict, total=False):
     style_avg_length_seconds: float | None
     # Script Agent output (Phase 3.2-3.4) — promoted into state the same
     # way research_summary/research_key_points are, for downstream nodes
-    # (Storyboard Agent, Phase 3.7, not built yet) and test visibility.
+    # (Storyboard, Phase 3.7) and test visibility.
     script_hook: str | None
     script_body: str | None
     script_cta: str | None
     script_caption: str | None
     script_title: str | None
     script_hashtags: list[str] | None
+    # Storyboard output (Phase 3.7, workflows/storyboard.py) — a list of
+    # {order, description, duration, caption_cue, visual_ref} dicts, same
+    # "only set on an actual successful result" promotion rule as the
+    # script_* fields above. See storyboard_node.
+    storyboard_scenes: list[dict[str, Any]] | None
     # One entry per real Agent call ({"agent_name", "status",
     # "tokens_used", "cost_usd", "provider"} — see _cost_entry()) — every
     # Agent already computes this on its AgentOutput.cost (CostInfo), but
@@ -275,10 +281,42 @@ def build_graph(registry: AgentRegistry | None = None):
         return update
 
     def storyboard_node(state: StudioState) -> dict:
-        # No dedicated Storyboard Agent in the registry (docs/roadmap.md
-        # 3.7: a custom LLM-prompting module, not a registered Agent) —
-        # this node marks the milestone event directly.
-        return {"events": ["storyboard.ready"]}
+        # Phase 3.7: no dedicated Storyboard Agent in the registry
+        # (docs/roadmap.md 3.7: a custom LLM-prompting module, not a
+        # registered Agent, same as idea_scoring_node) — this node calls
+        # workflows/storyboard.py directly against the script this run
+        # just drafted. No script (rejected idea, or a graph-shape test
+        # that never populated script_hook) means nothing to storyboard —
+        # same "can't judge/produce without real input" reasoning as
+        # idea_scoring_node's empty-summary case, just without a
+        # meaningful score to fall back to: this simply emits no scenes.
+        if not state.get("script_hook") and not state.get("script_body"):
+            return {"events": ["storyboard.ready"]}
+        try:
+            result = generate_storyboard(
+                hook=state.get("script_hook"),
+                body=state.get("script_body"),
+                cta=state.get("script_cta"),
+                title=state.get("script_title"),
+            )
+        except StoryboardError:
+            # A real LLM call may still have been made (and billed) before
+            # this raised — same known, documented under-reporting gap as
+            # idea_scoring_node's except branch.
+            return {"events": ["storyboard.ready"]}
+        return {
+            "events": ["storyboard.ready"],
+            "storyboard_scenes": result.scenes,
+            "agent_costs": [
+                {
+                    "agent_name": "storyboard",
+                    "status": "success",
+                    "tokens_used": result.tokens_used,
+                    "cost_usd": result.cost_usd,
+                    "provider": None,
+                }
+            ],
+        }
 
     def recording_node(state: StudioState) -> dict:
         return _agent_event(reg, "recording_agent", state)

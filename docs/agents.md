@@ -63,8 +63,8 @@ territory. When an Agent's schema changes, update this table's
 ## Idea scoring rubric (Phase 2.6/2.7 — implemented)
 
 Implementation: `workflows/idea_scoring.py`'s `score_idea()`. Not a
-registered Agent (no entry in the roster above) — like the future
-Storyboard step (Phase 3.7), it's a custom LLM-prompting module wired
+registered Agent (no entry in the roster above) — like the Storyboard
+module below (Phase 3.7), it's a custom LLM-prompting module wired
 directly into `workflows/graph.py`'s `idea_scoring_node`, run right after
 Research + Knowledge and before any expensive stage (ADR-003).
 
@@ -96,6 +96,43 @@ The score is persisted onto the `research_notes` row the Research Agent
 already wrote (`interest_score`/`scored_by` columns,
 `apps/api/app/services/research.py`'s `update_idea_score()`) — not a new
 row, per that module's original note that this UPDATE would come later.
+
+## Storyboard module (Phase 3.7 — implemented)
+
+Implementation: `workflows/storyboard.py`'s `generate_storyboard()`. Not
+a registered Agent (no entry in the roster above), same reasoning as the
+idea scoring rubric above — a custom LLM-prompting module wired directly
+into `workflows/graph.py`'s `storyboard_node`, which runs right after
+Script drafting. `docs/open-source-landscape.md` section 4 found no
+mature OSS library for "turn a script into a shot list," so this is a
+real implementation, not a wrapper.
+
+One LLM call turns the drafted script (hook/body/cta) into a small,
+ordered sequence of scenes (typically 3-8 for a short-form video), each:
+
+| Field | What it holds |
+|---|---|
+| `order` | Position in the sequence, renumbered sequentially in code (1, 2, 3, ...) regardless of what the LLM stated — same "don't trust the model with an invariant code can enforce" reasoning as idea scoring's criterion clamping. |
+| `description` | The visual instruction — what should be shown on screen for this scene. |
+| `duration` | Estimated seconds this scene takes, a positive number. |
+| `caption_cue` | Short on-screen text/caption for this scene, or `null`. |
+| `visual_ref` | Always `null` for now — no asset library/B-roll search is wired up yet (Recording/Video Agent territory, still Stub Agents); a human or a later phase fills this in. |
+
+`storyboard_node` skips itself — no LLM call, `storyboard_scenes` stays
+unset, `agent_costs` gets no entry — when there's no `script_hook`/
+`script_body` to work from (a rejected idea never reaches this node
+anyway; a graph-shape test that never populated a script is the other
+case). A `StoryboardError` (LLM failure, non-JSON response, empty/
+malformed scenes) is caught the same way and treated as "no scenes
+produced," never a crash — the graph still emits `storyboard.ready`
+either way, same as `idea_scoring_node` always emitting `idea.scored`
+even on a scoring failure.
+
+Persisted onto a new `storyboards` row (`docs/database.md`,
+`apps/api/app/models.py`'s `Storyboard`) linked to the `scripts` row it
+was generated from via `script_id` — a fresh row per run, same
+"re-running is the recovery path, not editing in place" convention as
+`Script`/`ResearchNote`.
 
 ## Knowledge Agent (Phase 2.8/2.9 — implemented)
 

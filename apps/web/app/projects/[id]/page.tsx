@@ -166,6 +166,29 @@ export default function ProjectTimelinePage() {
           ) : (
             <p>No script produced for this run (idea rejected, or no ANTHROPIC_API_KEY/VOYAGE_API_KEY configured — see Makefile's run-api target).</p>
           )}
+
+          {lastRun.storyboard_scenes && lastRun.storyboard_scenes.length > 0 && (
+            <div style={{ marginTop: "1rem" }}>
+              <h3>Storyboard</h3>
+              <p style={{ fontSize: "0.85rem", color: "#666" }}>
+                Scene breakdown — not the real Storyboard view yet (that&apos;s a later phase), just a stopgap so
+                there&apos;s something to see.
+              </p>
+              <ol style={{ display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 640 }}>
+                {lastRun.storyboard_scenes.map((scene) => (
+                  <li key={scene.order} style={{ border: "1px solid #eee", borderRadius: 4, padding: "0.5rem" }}>
+                    <p>
+                      <strong>Scene {scene.order}</strong> — {scene.duration}s
+                    </p>
+                    <p>{scene.description}</p>
+                    {scene.caption_cue && (
+                      <p style={{ fontStyle: "italic" }}>Caption: {scene.caption_cue}</p>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
         </div>
       )}
 

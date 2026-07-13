@@ -97,6 +97,18 @@ class ScriptResultOut(BaseModel):
     hashtags: list[str] | None
 
 
+class StoryboardSceneOut(BaseModel):
+    """One scene from workflows/storyboard.py's generate_storyboard() —
+    see that module's docstring for why `visual_ref` is always null for
+    now (no asset library/B-roll search wired up yet)."""
+
+    order: int
+    description: str
+    duration: float
+    caption_cue: str | None
+    visual_ref: str | None
+
+
 class ProjectRunOut(BaseModel):
     """Response for `POST /api/projects/{id}/run` — see
     app.services.orchestrator's module docstring for what this endpoint
@@ -113,6 +125,8 @@ class ProjectRunOut(BaseModel):
     script: ScriptResultOut | None
     approval_id: str | None = None
     total_cost_usd: float = 0.0
+    storyboard_id: str | None = None
+    storyboard_scenes: list[StoryboardSceneOut] | None = None
 
 
 class PromptCreate(BaseModel):

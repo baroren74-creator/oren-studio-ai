@@ -5,12 +5,13 @@ agent_runs, agent_events, approvals. `research_notes` was added in Phase
 2.3 alongside the real Research Agent (agents/research_agent/agent.py),
 `style_profile` in Phase 3.1 alongside the style questionnaire, `scripts`
 in Phase 3.2-3.4 alongside the real Script Agent, `prompt_library` in
-Phase 3.5 alongside its CRUD UI — each the first table added
+Phase 3.5 alongside its CRUD UI, `storyboards` in Phase 3.7 alongside the
+Storyboard module (workflows/storyboard.py) — each the first table added
 incrementally as the feature that needs it landed, per the Phase 1 note
-below. The rest of docs/database.md's schema (ideas, storyboards,
-assets, videos, publications, memory_entries, favorite_tools,
-brand_assets) is still added incrementally in later phases as those
-features are built — not all at once here.
+below. The rest of docs/database.md's schema (ideas, assets, videos,
+publications, memory_entries, favorite_tools, brand_assets) is still
+added incrementally in later phases as those features are built — not
+all at once here.
 """
 
 from __future__ import annotations
@@ -181,6 +182,40 @@ class Script(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 
     project: Mapped["Project"] = relationship(back_populates="scripts")
+    storyboards: Mapped[list["Storyboard"]] = relationship(back_populates="script", cascade="all, delete-orphan")
+
+
+class Storyboard(Base):
+    """Persisted output of the Storyboard module (docs/database.md) — one
+    row per successful `workflows/storyboard.py.generate_storyboard()`
+    call for a given Script. `scenes` stores the module's ordered list of
+    `{order, description, duration, caption_cue, visual_ref}` dicts
+    verbatim as JSON — `JSONB` in docs/database.md, same engine-agnostic
+    `JSON` simplification `ResearchNote.key_points`/`Script.hashtags`
+    already use (works identically on SQLite in tests and Postgres in
+    production).
+
+    One script can in principle get more than one storyboard (e.g. a
+    re-run after editing the script) — no uniqueness constraint on
+    `script_id`, same "re-running is the recovery path, not editing a
+    row in place" reasoning as Script/ResearchNote.
+
+    `created_at` isn't in docs/database.md's minimal `storyboards`
+    listing but is added here for the same reason every other table in
+    this file has one (ordering "which storyboard is latest" without a
+    separate `version` column, matching Script/ResearchNote's own
+    columns) — the doc lists the columns that matter for the schema
+    design; this file is allowed to add bookkeeping columns like this
+    one."""
+
+    __tablename__ = "storyboards"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=_uuid)
+    script_id: Mapped[str] = mapped_column(ForeignKey("scripts.id"))
+    scenes: Mapped[list | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+    script: Mapped["Script"] = relationship(back_populates="storyboards")
 
 
 class PromptLibraryEntry(Base):

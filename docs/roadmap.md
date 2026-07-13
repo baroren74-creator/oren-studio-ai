@@ -505,7 +505,50 @@ in case scheduled/automated posting is wanted later.
 3.7 Storyboard Agent: **custom LLM-prompting module** (structured JSON:
     scene, duration, visual instruction, caption cue) — no mature OSS
     library exists for this (see `docs/open-source-landscape.md` section
-    4), budget real implementation time here.
+    4), budget real implementation time here. **Done.**
+    `workflows/storyboard.py`'s `generate_storyboard()` — same shape as
+    `workflows/idea_scoring.py`'s `score_idea()` (not a registered Agent,
+    a custom LLM-prompting module wired directly into
+    `workflows/graph.py`'s `storyboard_node`): one LLM call turns a
+    drafted script (hook/body/cta) into an ordered list of scenes, each
+    `{order, description, duration, caption_cue, visual_ref}`.
+    `visual_ref` is always `None` for now — no asset library/B-roll
+    search exists yet (later phase). `MAX_SCENES` (20) guards against a
+    malformed/runaway response; scenes are always renumbered
+    sequentially in code rather than trusting the LLM's stated `order`,
+    same "don't let the model own an invariant code can enforce"
+    reasoning as idea scoring's criterion clamping.
+
+    `storyboard_node` skips itself (no LLM call, no cost) when there's no
+    `script_hook`/`script_body` to work from (rejected idea, or a
+    graph-shape test that never populated a script) — same reasoning as
+    `idea_scoring_node`'s empty-summary short-circuit. A `StoryboardError`
+    (LLM failure or malformed JSON) is also caught and treated as "no
+    scenes produced," not a crash — the graph always still emits
+    `storyboard.ready`.
+
+    Persistence: `apps/api/app/models.py`'s `Storyboard` (table
+    `storyboards`, matching `docs/database.md` plus a `created_at`
+    bookkeeping column, same divergence-with-a-comment pattern every
+    other model here uses), migration `b7e3f0a5c1d9`,
+    `apps/api/app/services/storyboard.py`'s `persist_storyboard()`
+    (mirrors `persist_script()` — a no-op on an empty/missing scenes
+    list, same "re-run is the recovery path" reasoning). `orchestrator.py`
+    persists a storyboard row right after a script is persisted, linked
+    by `script_id`; `ProjectRunOut` gained `storyboard_id`/
+    `storyboard_scenes`. `apps/web`'s project page shows the scene list
+    under the script (stopgap only — the real Storyboard view is 3.8,
+    not built here).
+
+    Tests: `workflows/tests/test_storyboard.py` (12 cases — parsing,
+    validation, error paths, same style as `test_idea_scoring.py`),
+    `apps/api/tests/test_storyboard_persistence.py` (3 cases), plus
+    `test_orchestrator.py`/`test_smoke_e2e.py` updates so every test
+    whose script now succeeds mocks `workflows.graph.generate_storyboard`
+    (same reason those tests already mock `score_idea` — no real network
+    call in the suite). Full suite: 166 tests passing. `apps/web`:
+    `npx tsc --noEmit` and `npm run build` both clean. Alembic migration
+    verified against a throwaway SQLite DB (`alembic upgrade head`).
 3.8 UI: Storyboard view (scene list + preview).
 3.9 Approved scripts feed `personal_style` in Qdrant.
 3.10 End-to-end test: approved idea → script → storyboard shown for

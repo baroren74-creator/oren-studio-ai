@@ -62,6 +62,17 @@ export type ScriptResult = {
   hashtags: string[] | null;
 };
 
+// One scene from workflows/storyboard.py's generate_storyboard() —
+// visual_ref is always null for now (no asset library/B-roll search
+// wired up yet, see that module's docstring).
+export type StoryboardScene = {
+  order: number;
+  description: string;
+  duration: number;
+  caption_cue: string | null;
+  visual_ref: string | null;
+};
+
 // Response shape for POST /api/projects/{id}/run — see
 // apps/api/app/services/orchestrator.py's module docstring for what
 // this endpoint actually does (a synchronous v0 graph run).
@@ -76,6 +87,8 @@ export type ProjectRun = {
   script: ScriptResult | null;
   approval_id: string | null;
   total_cost_usd: number;
+  storyboard_id: string | null;
+  storyboard_scenes: StoryboardScene[] | null;
 };
 
 // Phase 3.6, Approval Gate #1 — see

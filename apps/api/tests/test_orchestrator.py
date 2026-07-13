@@ -22,9 +22,10 @@ from core.registry import AgentRegistry
 from core.schemas.agent import AgentOutput, CostInfo
 from core.stub_agent import StubAgent
 
-from app.models import AgentRun, Approval, Project, ResearchNote, Script
+from app.models import AgentRun, Approval, Project, ResearchNote, Script, Storyboard
 from app.services.orchestrator import ProjectNotFoundError, run_project
 from app.services.style_profile import create_style_profile
+from workflows.storyboard import StoryboardResult
 
 _STUB_NEXT_EVENTS = {
     "knowledge_agent": "source.ingested",
@@ -111,6 +112,22 @@ def test_run_project_persists_research_and_script(client, monkeypatch):
         monkeypatch.setattr("workflows.graph.score_idea", lambda **kwargs: __import__("types").SimpleNamespace(
             total=100.0, cost_usd=0.001, tokens_used=150, breakdown={"novelty": 25, "audience_relevance": 25, "source_reliability": 25, "visual_potential": 25}
         ))
+        # Phase 3.7: storyboard_node calls this directly (not a
+        # registered Agent — see workflows/storyboard.py's docstring),
+        # so it's mocked the same way score_idea is above, not via the
+        # registry.
+        monkeypatch.setattr(
+            "workflows.graph.generate_storyboard",
+            lambda **kwargs: StoryboardResult(
+                scenes=[
+                    {"order": 1, "description": "Terminal running install.", "duration": 4.5, "caption_cue": "npm install", "visual_ref": None},
+                    {"order": 2, "description": "App running in browser.", "duration": 6.0, "caption_cue": None, "visual_ref": None},
+                ],
+                generated_by="storyboard@0.1.0:test",
+                cost_usd=0.003,
+                tokens_used=200,
+            ),
+        )
 
         result = run_project(db, project.id, registry=_registry_with_real_research_and_script())
 
@@ -120,6 +137,9 @@ def test_run_project_persists_research_and_script(client, monkeypatch):
         assert result["research_note_id"] is not None
         assert result["script_id"] is not None
         assert result["approval_id"] is not None
+        assert result["storyboard_id"] is not None
+        assert len(result["storyboard_scenes"]) == 2
+        assert result["storyboard_scenes"][0]["description"] == "Terminal running install."
 
         note = db.get(ResearchNote, result["research_note_id"])
         assert note.summary == "A demo repo."
@@ -136,16 +156,23 @@ def test_run_project_persists_research_and_script(client, monkeypatch):
         assert approval.stage == "script"
         assert approval.status == "pending"
 
+        # Phase 3.7: a storyboard row is linked to the script it was
+        # generated from.
+        storyboard = db.get(Storyboard, result["storyboard_id"])
+        assert storyboard.script_id == script.id
+        assert len(storyboard.scenes) == 2
+
         # Cost tracking: every real Agent/scoring call in this run
-        # (research_agent, idea_scoring, script_agent — the stubbed
-        # knowledge/recording/video/voice/publishing nodes contribute
-        # $0 rows too) should now be a real agent_runs row.
-        assert abs(result["total_cost_usd"] - 0.031) < 1e-9
+        # (research_agent, idea_scoring, script_agent, storyboard — the
+        # stubbed knowledge/recording/video/voice/publishing nodes
+        # contribute $0 rows too) should now be a real agent_runs row.
+        assert abs(result["total_cost_usd"] - 0.034) < 1e-9
         runs = db.query(AgentRun).filter(AgentRun.project_id == project.id).all()
         run_names = {r.agent_name for r in runs}
         assert "research_agent" in run_names
         assert "idea_scoring" in run_names
         assert "script_agent" in run_names
+        assert "storyboard" in run_names
         research_run = next(r for r in runs if r.agent_name == "research_agent")
         assert float(research_run.cost_usd) == 0.01
         assert research_run.tokens_used == 500
@@ -207,6 +234,14 @@ def test_run_project_seeds_style_profile_into_script_payload(client, monkeypatch
         monkeypatch.setattr("workflows.graph.score_idea", lambda **kwargs: __import__("types").SimpleNamespace(
             total=100.0, cost_usd=0.0, tokens_used=0, breakdown={}
         ))
+        # Same reasoning as test_run_project_persists_research_and_script:
+        # this test's script succeeds, so storyboard_node would otherwise
+        # reach the real (unmocked) generate_storyboard() and attempt a
+        # real LLM call.
+        monkeypatch.setattr(
+            "workflows.graph.generate_storyboard",
+            lambda **kwargs: StoryboardResult(scenes=[{"order": 1, "description": "d", "duration": 1.0, "caption_cue": None, "visual_ref": None}]),
+        )
 
         received = []
 
@@ -260,6 +295,10 @@ def test_run_route_returns_200_and_persists(client, monkeypatch):
     monkeypatch.setattr("workflows.graph.score_idea", lambda **kwargs: __import__("types").SimpleNamespace(
         total=100.0, cost_usd=0.0, tokens_used=0, breakdown={}
     ))
+    monkeypatch.setattr(
+        "workflows.graph.generate_storyboard",
+        lambda **kwargs: StoryboardResult(scenes=[{"order": 1, "description": "d", "duration": 1.0, "caption_cue": None, "visual_ref": None}]),
+    )
     # The route uses the real default_registry, which agents/*/agent.py
     # modules populate as an import side-effect when apps.api.app.main
     # loads (see that module's comment) — the client fixture already

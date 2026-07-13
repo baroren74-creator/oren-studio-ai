@@ -5,6 +5,33 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Phase 3.7: Storyboard module (script → scene breakdown)
+- `workflows/storyboard.py`: `generate_storyboard()` — a custom
+  LLM-prompting module (not a registered Agent, same shape as
+  `workflows/idea_scoring.py`'s `score_idea()`), turns a drafted script
+  (hook/body/cta) into an ordered scene list, each `{order, description,
+  duration, caption_cue, visual_ref}`. `visual_ref` is always `null` for
+  now (no asset library/B-roll search wired up yet).
+- `workflows/graph.py`: `storyboard_node` now calls it for real, adding
+  `storyboard_scenes` to `StudioState` and a `storyboard` `agent_costs`
+  entry. Skips itself (no LLM call) when there's no script to work from,
+  or on a `StoryboardError` — never a crash, `storyboard.ready` still
+  fires either way.
+- Persistence: `apps/api/app/models.py`'s `Storyboard` (table
+  `storyboards`, migration `b7e3f0a5c1d9`),
+  `apps/api/app/services/storyboard.py`'s `persist_storyboard()`.
+  `orchestrator.py` persists a storyboard row right after a script,
+  linked by `script_id`. `ProjectRunOut` gained `storyboard_id`/
+  `storyboard_scenes`.
+- `apps/web/app/projects/[id]/page.tsx`: shows the scene list under the
+  script (stopgap only — the real Storyboard view is a later phase).
+- Tests: `workflows/tests/test_storyboard.py` (12 cases),
+  `apps/api/tests/test_storyboard_persistence.py` (3 cases), plus
+  `test_orchestrator.py`/`test_smoke_e2e.py` updates to mock the new LLM
+  call wherever a script now succeeds. Full suite: 166 tests passing.
+  `apps/web`: `tsc --noEmit` and `next build` clean. Alembic migration
+  verified against a throwaway SQLite DB.
+
 ### Added — real cost tracking (Ops page + per-run total)
 - Raised directly by Oren after a live cost-safety conversation: the
   Ops page (`apps/web/app/ops/page.tsx`) had existed since Phase 1 but
