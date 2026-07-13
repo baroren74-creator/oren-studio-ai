@@ -9,6 +9,7 @@ module's docstring).
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 # Import every agent module so it registers itself on
 # core.registry.default_registry (each agents/*/agent.py module
@@ -31,6 +32,22 @@ from app.routers import agent_runs, knowledge, projects, style_profile
 from app.ws import router as ws_router
 
 app = FastAPI(title="Oren Studio AI API", version="0.1.0")
+
+# apps/web (Next.js dev server, localhost:3000) calls this API from the
+# browser at a different origin (localhost:8000) — without CORS headers
+# the browser blocks every request before it even reaches a route
+# (surfaces in apps/web as a generic "Failed to fetch", no server log
+# at all, which is what made this easy to miss during backend-only
+# testing). Wide open for now: this is a single-user local dev tool
+# with no cookies/session auth (ADR-006's static API key doesn't rely
+# on the browser's own trust model), so there's no meaningful CSRF
+# surface to restrict origins against yet.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(projects.router)
 app.include_router(agent_runs.router)
