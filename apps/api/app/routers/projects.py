@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.deps import get_db, require_api_key
 from app.models import AgentEvent, AgentRun, Project
-from app.schemas import AgentEventOut, ProjectCreate, ProjectOut, ProjectRunOut
+from app.schemas import AgentEventOut, ApprovalOut, ProjectCreate, ProjectOut, ProjectRunOut
+from app.services.approvals import list_approvals_for_project
 from app.services.orchestrator import ProjectNotFoundError, run_project
 
 router = APIRouter(prefix="/api/projects", tags=["projects"], dependencies=[Depends(require_api_key)])
@@ -48,6 +49,14 @@ def get_project_timeline(project_id: str, db: Session = Depends(get_db)) -> list
         select(AgentEvent).where(AgentEvent.run_id.in_(run_ids)).order_by(AgentEvent.created_at)
     ).all()
     return list(events)
+
+
+@router.get("/{project_id}/approvals", response_model=list[ApprovalOut])
+def get_project_approvals(project_id: str, db: Session = Depends(get_db)) -> list:
+    project = db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="project not found")
+    return list_approvals_for_project(db, project_id)
 
 
 @router.post("/{project_id}/run", response_model=ProjectRunOut)

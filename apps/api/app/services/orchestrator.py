@@ -37,6 +37,7 @@ from core.schemas.agent import AgentOutput
 from workflows.graph import build_graph
 
 from app.models import Project
+from app.services.approvals import create_approval
 from app.services.research import persist_research_note, update_idea_score
 from app.services.script import persist_script
 from app.services.style_profile import get_current_style_profile
@@ -121,6 +122,7 @@ def run_project(db: Session, project_id: str, *, registry: AgentRegistry | None 
 
     script_id = None
     script_result = None
+    approval_id = None
     if final_state.get("script_hook"):
         script_result = {
             "hook": final_state.get("script_hook"),
@@ -139,6 +141,12 @@ def run_project(db: Session, project_id: str, *, registry: AgentRegistry | None 
         )
         if script is not None:
             script_id = script.id
+            # Phase 3.6, Approval Gate #1: a drafted script always needs
+            # a human decision before the studio treats it as final —
+            # see app.services.approvals's module docstring for why this
+            # is a plain DB row rather than a graph interrupt().
+            approval = create_approval(db, project_id=project.id, stage="script")
+            approval_id = approval.id
 
     return {
         "run_id": run_id,
@@ -149,4 +157,5 @@ def run_project(db: Session, project_id: str, *, registry: AgentRegistry | None 
         "research_note_id": research_note_id,
         "script_id": script_id,
         "script": script_result,
+        "approval_id": approval_id,
     }

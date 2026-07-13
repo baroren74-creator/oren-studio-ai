@@ -421,7 +421,53 @@ in case scheduled/automated posting is wanted later.
     200/201/204/404s, auth). Full suite: 130 tests passing (`make
     test`). `apps/web`: `npx tsc --noEmit` and `npm run build` both
     clean.
-3.6 Approval Gate #1: review/edit script before continuing.
+3.6 Approval Gate #1: review/edit script before continuing. **Done.**
+    Implemented as a standalone DB-backed review step (`approvals`
+    table, already migrated since Phase 1), deliberately NOT wired
+    through `workflows/graph.py`'s `interrupt()`/`Command(resume=...)`
+    mechanism the way Approval Gate #2 (`final_review_node`) is. Two
+    reasons, both documented in full in
+    `app/services/approvals.py`'s module docstring: (1) the v0
+    synchronous orchestrator (`app/services/orchestrator.py`, Phase
+    3.4.5) builds a fresh `MemorySaver()` on every HTTP request, so a
+    graph paused mid-request has no persistent checkpoint to resume from
+    on a *later* request — a pre-existing gap already latent in Approval
+    Gate #2, not introduced here; (2) nothing of real consequence
+    happens after script drafting yet — `storyboard_node` (Phase 3.7,
+    not built) and the recording/video/voice nodes are all still Stub
+    Agents, so there's nothing meaningful to gate a graph resume behind
+    right now. Revisit once Phase 3.7 makes "continuing past the gate"
+    mean something, and once a persistent checkpointer (or the real
+    `services/orchestrator-worker`) makes an actual resume possible.
+
+    `app/services/approvals.py`: `create_approval` (always starts
+    `pending`), `get_approval`, `list_approvals_for_project` (orders by
+    `decided_at`, which conveniently puts still-`pending` rows first
+    since that column is `NULL` until decided), `decide_approval`
+    (`status` is `approved`/`rejected`/`edited` — "edited" is what
+    `request-edit`'s notes describe, not a final accept/reject; raises
+    `ApprovalNotFoundError` for an unknown id).
+
+    `app/services/orchestrator.py`: `run_project()` now creates a
+    `pending` `Approval(stage="script")` immediately after a `Script`
+    row is persisted, and returns its id as `ProjectRunOut.approval_id`.
+
+    Routes: `POST /api/approvals/{id}/approve`, `/reject`,
+    `/request-edit` (`{notes}`); `GET /api/projects/{id}/approvals`.
+
+    `apps/web/app/projects/[id]/page.tsx`: shows a pending approval (if
+    any) with Approve / Reject / Request edit (with a notes textarea)
+    buttons, and a history list of already-decided approvals below it.
+    `apps/web/lib/api.ts` gained the `Approval` type and
+    `listApprovals`/`approveApproval`/`rejectApproval`/
+    `requestEditApproval` wrappers, plus `ProjectRun.approval_id`.
+
+    Tests: `apps/api/tests/test_approvals.py` (14 cases — service layer
+    invariants, route layer 200/404s, project scoping, auth), plus
+    `test_orchestrator.py` assertions that persisting a script always
+    creates a matching pending Approval (and that a rejected idea
+    creates none). Full suite: 144 tests passing (`make test`).
+    `apps/web`: `npx tsc --noEmit` and `npm run build` both clean.
 3.7 Storyboard Agent: **custom LLM-prompting module** (structured JSON:
     scene, duration, visual instruction, caption cue) — no mature OSS
     library exists for this (see `docs/open-source-landscape.md` section

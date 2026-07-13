@@ -9,10 +9,16 @@
 // below the timeline once a run completes; before Phase 3.7's real
 // Storyboard UI exists, this is the fastest way to see actual pipeline
 // output rather than just a raw event list.
+//
+// Phase 3.6, Approval Gate #1: a drafted script always comes with a
+// pending Approval row (apps/api/app/services/orchestrator.py). This
+// page shows it and lets Oren approve / reject / request an edit — see
+// apps/api/app/services/approvals.py's module docstring for why this
+// is a standalone review step rather than resuming a paused graph run.
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { api, type AgentEvent, type Project, type ProjectRun } from "@/lib/api";
+import { api, type AgentEvent, type Approval, type Project, type ProjectRun } from "@/lib/api";
 
 export default function ProjectTimelinePage() {
   const params = useParams<{ id: string }>();
@@ -24,6 +30,12 @@ export default function ProjectTimelinePage() {
   const [runError, setRunError] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<ProjectRun | null>(null);
 
+  const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [deciding, setDeciding] = useState(false);
+  const [decideError, setDecideError] = useState<string | null>(null);
+  const [editNotes, setEditNotes] = useState("");
+  const [showEditForm, setShowEditForm] = useState(false);
+
   function loadProject(id: string) {
     return Promise.all([api.getProject(id), api.getProjectTimeline(id)]).then(([p, e]) => {
       setProject(p);
@@ -31,9 +43,15 @@ export default function ProjectTimelinePage() {
     });
   }
 
+  function loadApprovals(id: string) {
+    return api.listApprovals(id).then(setApprovals);
+  }
+
   useEffect(() => {
     if (!params.id) return;
-    loadProject(params.id).catch((err) => setError(err instanceof Error ? err.message : "failed to load project"));
+    Promise.all([loadProject(params.id), loadApprovals(params.id)]).catch((err) =>
+      setError(err instanceof Error ? err.message : "failed to load project")
+    );
   }, [params.id]);
 
   async function handleRun() {
@@ -43,7 +61,7 @@ export default function ProjectTimelinePage() {
     try {
       const run = await api.runProject(params.id);
       setLastRun(run);
-      await loadProject(params.id);
+      await Promise.all([loadProject(params.id), loadApprovals(params.id)]);
     } catch (err) {
       setRunError(err instanceof Error ? err.message : "run failed");
     } finally {
@@ -51,8 +69,52 @@ export default function ProjectTimelinePage() {
     }
   }
 
+  async function handleApprove(approval: Approval) {
+    setDeciding(true);
+    setDecideError(null);
+    try {
+      await api.approveApproval(approval.id);
+      if (params.id) await loadApprovals(params.id);
+    } catch (err) {
+      setDecideError(err instanceof Error ? err.message : "failed to approve");
+    } finally {
+      setDeciding(false);
+    }
+  }
+
+  async function handleReject(approval: Approval) {
+    setDeciding(true);
+    setDecideError(null);
+    try {
+      await api.rejectApproval(approval.id);
+      if (params.id) await loadApprovals(params.id);
+    } catch (err) {
+      setDecideError(err instanceof Error ? err.message : "failed to reject");
+    } finally {
+      setDeciding(false);
+    }
+  }
+
+  async function handleRequestEdit(approval: Approval) {
+    setDeciding(true);
+    setDecideError(null);
+    try {
+      await api.requestEditApproval(approval.id, editNotes);
+      setEditNotes("");
+      setShowEditForm(false);
+      if (params.id) await loadApprovals(params.id);
+    } catch (err) {
+      setDecideError(err instanceof Error ? err.message : "failed to request edit");
+    } finally {
+      setDeciding(false);
+    }
+  }
+
   if (error) return <p style={{ color: "crimson" }}>{error}</p>;
   if (!project) return <p>Loading…</p>;
+
+  const pendingApproval = approvals.find((a) => a.status === "pending") ?? null;
+  const decidedApprovals = approvals.filter((a) => a.status !== "pending");
 
   return (
     <div>
@@ -100,6 +162,57 @@ export default function ProjectTimelinePage() {
           ) : (
             <p>No script produced for this run (idea rejected, or no ANTHROPIC_API_KEY/VOYAGE_API_KEY configured — see Makefile's run-api target).</p>
           )}
+        </div>
+      )}
+
+      {pendingApproval && (
+        <div style={{ border: "2px solid #d9a441", borderRadius: 6, padding: "1rem", marginBottom: "1.5rem" }}>
+          <h2>Approval needed — {pendingApproval.stage}</h2>
+          <p>The drafted script is waiting for a decision before this project moves on.</p>
+          {decideError && <p style={{ color: "crimson" }}>{decideError}</p>}
+          <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
+            <button type="button" onClick={() => handleApprove(pendingApproval)} disabled={deciding}>
+              Approve
+            </button>
+            <button type="button" onClick={() => handleReject(pendingApproval)} disabled={deciding}>
+              Reject
+            </button>
+            <button type="button" onClick={() => setShowEditForm((v) => !v)} disabled={deciding}>
+              Request edit
+            </button>
+          </div>
+          {showEditForm && (
+            <div style={{ marginTop: "0.75rem", display: "flex", flexDirection: "column", gap: "0.5rem", maxWidth: 480 }}>
+              <textarea
+                placeholder="What should change?"
+                rows={3}
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+              />
+              <button
+                type="button"
+                onClick={() => handleRequestEdit(pendingApproval)}
+                disabled={deciding || editNotes.trim() === ""}
+              >
+                Send edit request
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {decidedApprovals.length > 0 && (
+        <div style={{ marginBottom: "1.5rem" }}>
+          <h3>Approval history</h3>
+          <ul>
+            {decidedApprovals.map((a) => (
+              <li key={a.id}>
+                {a.stage}: <strong>{a.status}</strong>
+                {a.notes ? ` — "${a.notes}"` : ""}
+                {a.decided_at ? ` (${new Date(a.decided_at).toLocaleString()})` : ""}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

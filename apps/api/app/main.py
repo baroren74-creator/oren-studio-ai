@@ -28,7 +28,7 @@ import agents.trend_agent.agent  # noqa: F401
 import agents.video_agent.agent  # noqa: F401
 import agents.voice_agent.agent  # noqa: F401
 
-from app.routers import agent_runs, knowledge, projects, prompt_library, style_profile
+from app.routers import agent_runs, approvals, knowledge, projects, prompt_library, style_profile
 from app.ws import router as ws_router
 
 app = FastAPI(title="Oren Studio AI API", version="0.1.0")
@@ -54,6 +54,7 @@ app.include_router(agent_runs.router)
 app.include_router(knowledge.router)
 app.include_router(style_profile.router)
 app.include_router(prompt_library.router)
+app.include_router(approvals.router)
 app.include_router(ws_router)
 
 

@@ -22,7 +22,7 @@ from core.registry import AgentRegistry
 from core.schemas.agent import AgentOutput
 from core.stub_agent import StubAgent
 
-from app.models import Project, ResearchNote, Script
+from app.models import Approval, Project, ResearchNote, Script
 from app.services.orchestrator import ProjectNotFoundError, run_project
 from app.services.style_profile import create_style_profile
 
@@ -117,6 +117,7 @@ def test_run_project_persists_research_and_script(client, monkeypatch):
         assert result["script"]["hook"] == "h"
         assert result["research_note_id"] is not None
         assert result["script_id"] is not None
+        assert result["approval_id"] is not None
 
         note = db.get(ResearchNote, result["research_note_id"])
         assert note.summary == "A demo repo."
@@ -125,6 +126,13 @@ def test_run_project_persists_research_and_script(client, monkeypatch):
         script = db.get(Script, result["script_id"])
         assert script.hook == "h"
         assert script.hashtags == ["#tag"]
+
+        # Phase 3.6: persisting a script always creates a pending
+        # Approval Gate #1 row alongside it (app.services.orchestrator).
+        approval = db.get(Approval, result["approval_id"])
+        assert approval.project_id == project.id
+        assert approval.stage == "script"
+        assert approval.status == "pending"
     finally:
         db.close()
 
@@ -156,6 +164,7 @@ def test_run_project_rejected_idea_persists_research_but_no_script(client, monke
         assert result["idea_score"] == 10.0
         assert result["script"] is None
         assert result["script_id"] is None
+        assert result["approval_id"] is None
         assert result["research_note_id"] is not None
     finally:
         db.close()
@@ -248,6 +257,7 @@ def test_run_route_returns_200_and_persists(client, monkeypatch):
     body = resp.json()
     assert body["idea_score"] == 100.0
     assert body["script"]["hook"] == "h"
+    assert body["approval_id"] is not None
 
 
 def test_run_route_returns_404_for_missing_project(client):

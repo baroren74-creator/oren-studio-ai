@@ -18,14 +18,26 @@ POST   /api/projects/{id}/run            v0 synchronous graph run — done (Phas
                                           services/orchestrator-worker). Persists a ResearchNote
                                           and, if the idea passed scoring, a Script. Returns
                                           ProjectRunOut: run_id, events, rejected, interrupted,
-                                          idea_score, research_note_id, script_id, script.
+                                          idea_score, research_note_id, script_id, script, approval_id.
+                                          A successfully persisted Script always creates a pending
+                                          Approval(stage="script") alongside it — see below.
+GET    /api/projects/{id}/approvals      all approvals for a project, still-pending ones first — done
+                                          (Phase 3.6)
 
 POST   /api/agents/{agent_name}/run      manual/debug run of a single agent
 GET    /api/agent-runs/{id}
 
-POST   /api/approvals/{id}/approve
-POST   /api/approvals/{id}/reject
-POST   /api/approvals/{id}/request-edit  {notes}
+POST   /api/approvals/{id}/approve       done (Phase 3.6) — sets status=approved, decided_at=now
+POST   /api/approvals/{id}/reject        done — sets status=rejected, decided_at=now
+POST   /api/approvals/{id}/request-edit  {notes}  done — sets status=edited, notes, decided_at=now.
+                                          See apps/api/app/services/approvals.py's module docstring for
+                                          why this is a standalone DB-backed gate (Approval Gate #1) rather
+                                          than workflows/graph.py's interrupt()/resume mechanism — the v0
+                                          synchronous orchestrator has no persistent checkpointer to
+                                          resume a paused run from on a later request, and nothing after
+                                          script drafting is real yet (storyboard/recording/video/voice
+                                          are still Stub Agents), so there's nothing to meaningfully gate
+                                          a resume of.
 
 GET    /api/knowledge/search?q=...       semantic search — done (Phase 2.9), currently returns Qdrant's
                                           own payload, not yet Postgres-hydrated (no sources rows persisted

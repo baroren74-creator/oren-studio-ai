@@ -74,6 +74,19 @@ export type ProjectRun = {
   research_note_id: string | null;
   script_id: string | null;
   script: ScriptResult | null;
+  approval_id: string | null;
+};
+
+// Phase 3.6, Approval Gate #1 — see
+// apps/api/app/services/approvals.py's module docstring for why this is
+// a standalone DB-backed gate rather than resuming a paused graph run.
+export type Approval = {
+  id: string;
+  project_id: string;
+  stage: string;
+  status: string; // pending | approved | rejected | edited
+  notes: string | null;
+  decided_at: string | null;
 };
 
 // Phase 3.5 — see apps/api/app/services/prompt_library.py's module
@@ -104,4 +117,10 @@ export const api = {
   createPromptVersion: (id: string, body: { prompt_text?: string; category?: string }) =>
     request<Prompt>(`/api/prompt-library/${id}/versions`, { method: "POST", body: JSON.stringify(body) }),
   deletePrompt: (id: string) => request<void>(`/api/prompt-library/${id}`, { method: "DELETE" }),
+
+  listApprovals: (projectId: string) => request<Approval[]>(`/api/projects/${projectId}/approvals`),
+  approveApproval: (id: string) => request<Approval>(`/api/approvals/${id}/approve`, { method: "POST" }),
+  rejectApproval: (id: string) => request<Approval>(`/api/approvals/${id}/reject`, { method: "POST" }),
+  requestEditApproval: (id: string, notes: string) =>
+    request<Approval>(`/api/approvals/${id}/request-edit`, { method: "POST", body: JSON.stringify({ notes }) }),
 };

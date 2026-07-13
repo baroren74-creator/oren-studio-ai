@@ -111,6 +111,7 @@ class ProjectRunOut(BaseModel):
     research_note_id: str | None
     script_id: str | None
     script: ScriptResultOut | None
+    approval_id: str | None = None
 
 
 class PromptCreate(BaseModel):
@@ -138,5 +139,23 @@ class PromptOut(BaseModel):
     version: int
     parent_id: str | None
     created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ApprovalDecision(BaseModel):
+    """Body for request-edit (approve/reject take no body — see
+    app.routers.approvals)."""
+
+    notes: str | None = None
+
+
+class ApprovalOut(BaseModel):
+    id: str
+    project_id: str
+    stage: str
+    status: str
+    notes: str | None
+    decided_at: datetime | None
 
     model_config = {"from_attributes": True}

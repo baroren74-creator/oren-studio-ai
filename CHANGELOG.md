@@ -5,6 +5,28 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added — Phase 3.6: Approval Gate #1 (review/approve/reject/request-edit a script)
+- `apps/api/app/services/approvals.py`: `create_approval` (always
+  `pending`), `get_approval`, `list_approvals_for_project`,
+  `decide_approval` (approve/reject/request-edit). Deliberately a
+  standalone DB-backed gate, not LangGraph's `interrupt()`/resume —
+  see that module's docstring for why (the v0 orchestrator's
+  `MemorySaver()` doesn't persist across requests, and nothing after
+  script drafting is real yet, so there's nothing to meaningfully gate
+  a resume of).
+- `apps/api/app/services/orchestrator.py`: `run_project()` now creates
+  a pending `Approval(stage="script")` right after a `Script` persists,
+  and returns its id as `approval_id`.
+- Routes: `POST /api/approvals/{id}/approve`, `/reject`,
+  `/request-edit`; `GET /api/projects/{id}/approvals`.
+- `apps/web/app/projects/[id]/page.tsx`: shows a pending approval with
+  Approve/Reject/Request-edit actions, plus a history list of decided
+  ones. `apps/web/lib/api.ts` gained the `Approval` type and matching
+  wrappers.
+- Tests: `apps/api/tests/test_approvals.py` (14 cases) plus new
+  `test_orchestrator.py` assertions. Full suite: 144 tests passing
+  (`make test`). `apps/web`: `tsc --noEmit` and `next build` clean.
+
 ### Fixed — apps/api had no CORS headers
 - `apps/api/app/main.py`: added `CORSMiddleware` (wide open —
   single-user local tool, header-based API key auth, no cookie/session
